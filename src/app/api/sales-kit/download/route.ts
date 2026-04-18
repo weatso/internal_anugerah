@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getDownloadUrl } from '@/lib/r2/client'
+import { getPresignedUrl } from '@/lib/r2/client'
 import { createClient } from '@/lib/supabase/server'
 
 export async function GET(request: Request) {
@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   if (!key) return new Response('Key required', { status: 400 })
 
   try {
-    const url = await getDownloadUrl(key, 3600) // 1 Hour Presigned URL
+    const url = await getPresignedUrl(key, 3600) // 1 Hour Presigned URL
     return NextResponse.redirect(url)
   } catch (error) {
     return new Response('File not found', { status: 404 })
