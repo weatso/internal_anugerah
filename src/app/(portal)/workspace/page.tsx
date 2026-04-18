@@ -1,98 +1,204 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { motion } from 'framer-motion'
+import { FolderKanban, Plus, Search, Calendar, User, AlignLeft, CheckCircle2, AlertCircle, Eye, FileText, ChevronRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/components/providers/UserProvider'
-import { formatDate, getStatusColor, getStatusLabel, cn } from '@/lib/utils'
-import { Plus, Loader2, FolderKanban, ChevronRight } from 'lucide-react'
-import type { WorkspaceLog } from '@/types'
-import Link from 'next/link'
+import { formatDateTime, getStatusLabel } from '@/lib/utils'
+import { getEntityAccentColor, getDivisionConfig } from '@/lib/division-config'
+import type { WorkspaceLog, WorkspaceMetadata } from '@/types'
+
+const FADE_UP = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0 } }
 
 export default function WorkspacePage() {
-  const { profile } = useUser()
+  const { profile, effectiveEntityId, effectiveEntity } = useUser()
   const supabase = createClient()
-  const [logs, setLogs] = useState<WorkspaceLog[]>([])
-  const [loading, setLoading] = useState(true)
-  const [filterStatus, setFilterStatus] = useState('ALL')
 
-  async function fetchLogs() {
+  const [logs, setLogs]           = useState<WorkspaceLog[]>([])
+  const [loading, setLoading]     = useState(true)
+  const [search, setSearch]       = useState('')
+
+  useEffect(() => {
+    fetchData()
+  }, [effectiveEntityId])
+
+  async function fetchData() {
     setLoading(true)
-    let q = supabase.from('workspace_logs')
-      .select('*, entity:entities(id,name,type,logo_key,primary_color), creator:profiles!workspace_logs_created_by_fkey(id,full_name,role,entity_id)')
+    let query = supabase
+      .from('workspace_logs')
+      .select('*, entity:entities(*), creator:profiles!workspace_logs_created_by_fkey(id,full_name)')
       .order('created_at', { ascending: false })
-    if (filterStatus !== 'ALL') q = q.eq('status', filterStatus)
-    const { data } = await q
+
+    if (effectiveEntityId) {
+      query = query.eq('entity_id', effectiveEntityId)
+    }
+
+    const { data } = await query
     setLogs((data ?? []) as WorkspaceLog[])
     setLoading(false)
   }
 
-  useEffect(() => { if (profile) fetchLogs() }, [profile, filterStatus])
+  const accentColor = getEntityAccentColor(effectiveEntity)
+  const divConfig = getDivisionConfig(effectiveEntity?.name)
 
-  const statuses = ['ALL', 'SUBMITTED', 'REVIEWED_BY_CEO', 'NEEDS_ACTION']
+  const filteredLogs = logs.filter(l =>
+    !search ||
+    l.title.toLowerCase().includes(search.toLowerCase()) ||
+    l.content.toLowerCase().includes(search.toLowerCase())
+  )
 
   return (
-    <div className="p-6 md:p-8 space-y-6 animate-[slide-up_0.4s_ease]">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
+    <div className="p-4 md:p-6 lg:p-8 space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <p className="text-[#D4AF37] text-xs uppercase tracking-[0.3em] font-bold mb-1">Workspace</p>
-          <h1 className="text-[--color-text-primary] text-2xl font-black tracking-tight">Log Aktivitas</h1>
-          <p className="text-[--color-text-muted] text-sm mt-1">Update mingguan, progress report, dan tindak lanjut.</p>
+          <p className="text-[10px] uppercase tracking-[0.3em] font-bold mb-1" style={{ color: accentColor }}>
+            Polymorphic Workspace
+          </p>
+          <h1 className="text-[--color-text-primary] text-2xl font-black tracking-tight flex items-center gap-3">
+            <span className="text-3xl">{divConfig.emoji}</span>
+            Workspace {effectiveEntity?.name ?? 'Global'}
+          </h1>
+          <p className="text-[--color-text-muted] text-sm mt-1">
+            Task and Log management • {divConfig.displayName} Format
+          </p>
         </div>
         <Link href="/workspace/create"
-          className="flex items-center gap-2 bg-[#D4AF37] text-[#050505] font-bold px-4 py-2 rounded-md text-sm hover:bg-[#F5D678] transition-colors">
-          <Plus className="w-4 h-4" /> Buat Log
+          className="flex items-center gap-2 text-sm font-bold px-4 py-2.5 rounded-md transition-all hover:opacity-80 shrink-0"
+          style={{ background: accentColor, color: '#050505' }}>
+          <Plus className="w-4 h-4" /> Log Baru
         </Link>
       </div>
 
       {/* Filters */}
-      <div className="flex gap-2 flex-wrap">
-        {statuses.map(s => (
-          <button key={s} onClick={() => setFilterStatus(s)}
-            className={cn('px-4 py-1.5 rounded-full text-xs font-bold border transition-all uppercase tracking-widest',
-              filterStatus === s
-                ? s === 'ALL' ? 'bg-[#D4AF37]/15 text-[#D4AF37] border-[#D4AF37]/30' : getStatusColor(s) + ' border-opacity-40'
-                : 'border-[--color-border] text-[--color-text-muted] hover:text-[--color-text-primary]')}>
-            {s === 'ALL' ? 'Semua' : getStatusLabel(s)}
-          </button>
-        ))}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[--color-text-muted]" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder={`Cari log di ${effectiveEntity?.name ?? 'semua divisi'}...`}
+            className="w-full pl-9 pr-4 py-2 bg-white/[0.04] border border-[--color-border] rounded-md text-[--color-text-primary] text-sm placeholder:text-[--color-text-muted] focus:outline-none transition-colors"
+            style={{ '--tw-ring-color': accentColor } as any}
+          />
+        </div>
       </div>
 
-      {/* Log List */}
+      {/* List */}
       {loading ? (
-        <div className="flex justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-[#D4AF37]" /></div>
-      ) : logs.length === 0 ? (
-        <div className="glass-card py-16 flex flex-col items-center text-[--color-text-muted]">
-          <FolderKanban className="w-8 h-8 mb-3 opacity-30" />
-          <p className="text-sm">Belum ada log.</p>
+        <div className="flex justify-center py-20">
+          <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: accentColor, borderTopColor: 'transparent' }} />
+        </div>
+      ) : filteredLogs.length === 0 ? (
+        <div className="text-center py-20 glass-card">
+          <p className="text-[--color-text-muted] text-sm">Tidak ditemukan log.</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {logs.map(log => (
-            <Link key={log.id} href={`/workspace/${log.id}`}
-              className="glass-card px-5 py-4 flex items-center justify-between gap-4 hover:border-[--color-border-hover] transition-all group">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className={cn('px-2 py-0.5 rounded border text-[10px] font-bold uppercase tracking-wider shrink-0', getStatusColor(log.status))}>
-                    {getStatusLabel(log.status)}
-                  </span>
-                  {log.entity && (
-                    <span className="text-[--color-text-muted] text-xs">{log.entity.name}</span>
-                  )}
-                  {log.deadline && (
-                    <span className="text-amber-400 text-xs">Deadline: {formatDate(log.deadline)}</span>
-                  )}
-                </div>
-                <h3 className="text-[--color-text-primary] font-semibold truncate">{log.title}</h3>
-                <p className="text-[--color-text-muted] text-xs mt-0.5">
-                  oleh {log.creator?.full_name ?? '—'} · {formatDate(log.created_at)}
-                  {log.attachments && log.attachments.length > 0 && ` · ${log.attachments.length} lampiran`}
-                </p>
-              </div>
-              <ChevronRight className="w-4 h-4 text-[--color-text-muted] group-hover:text-[#D4AF37] group-hover:translate-x-0.5 transition-all shrink-0" />
-            </Link>
-          ))}
-        </div>
+        <motion.div initial="hidden" animate="show" variants={{ show: { transition: { staggerChildren: 0.05 } } }} className="space-y-3">
+          {filteredLogs.map(log => {
+            const meta = (log.metadata ?? {}) as any
+            const isMe = log.created_by === profile?.id
+            const eColor = getEntityAccentColor(log.entity)
+
+            return (
+              <motion.div key={log.id} variants={FADE_UP} className="glass-card hover:bg-white/[0.015] transition-colors group">
+                <Link href={`/workspace/${log.id}`} className="p-4 md:p-5 flex flex-col md:flex-row gap-4 md:items-center">
+                  
+                  {/* Left: Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-widest shrink-0"
+                        style={{ color: eColor, borderColor: `${eColor}30`, background: `${eColor}10` }}>
+                        {log.entity?.name} {log.log_type}
+                      </span>
+                      {log.status === 'NEEDS_ACTION' && <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 uppercase"><AlertCircle className="w-3 h-3" /> Action</span>}
+                      {log.status === 'REVIEWED_BY_CEO' && <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase"><CheckCircle2 className="w-3 h-3" /> Reviewed</span>}
+                      {log.status === 'SUBMITTED' && <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#f59e0b]/10 text-[#f59e0b] border border-[#f59e0b]/20 uppercase tracking-widest">Submitted</span>}
+                    </div>
+                    
+                    <h2 className="text-[--color-text-primary] font-bold text-base md:text-lg truncate group-hover:text-white transition-colors">
+                      {log.title}
+                    </h2>
+                    
+                    <div className="flex items-center gap-4 mt-2 text-xs text-[--color-text-muted] flex-wrap">
+                      <span className="flex items-center gap-1"><User className="w-3.5 h-3.5" /> {(log as any).creator?.full_name} {isMe && '(Anda)'}</span>
+                      <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> {formatDateTime(log.created_at)}</span>
+                      {log.attachments?.length ? <span className="flex items-center gap-1"><FileText className="w-3.5 h-3.5" /> {log.attachments.length} files</span> : null}
+                    </div>
+                  </div>
+
+                  {/* Right: Dynamic Metadata Preview */}
+                  <div className="shrink-0 w-full md:w-64 flex flex-col gap-1.5 md:items-end justify-center border-t md:border-t-0 md:border-l border-[--color-border] pt-3 md:pt-0 md:pl-5">
+                     <MetadataPreview logType={log.log_type} meta={meta} color={eColor} />
+                  </div>
+
+                  <div className="hidden md:flex shrink-0 items-center justify-center p-2 text-[--color-text-muted] group-hover:text-white transition-colors">
+                    <ChevronRight className="w-5 h-5" />
+                  </div>
+                </Link>
+              </motion.div>
+            )
+          })}
+        </motion.div>
       )}
     </div>
   )
+}
+
+function MetadataPreview({ logType, meta, color }: { logType: string, meta: any, color: string }) {
+  if (!meta || Object.keys(meta).length === 0) return <span className="text-xs text-[--color-text-muted] italic">Regular Log</span>
+
+  switch (logType) {
+    case 'WEATSO':
+      return (
+        <>
+          {meta.sprint && <span className="text-xs font-mono px-2 py-0.5 bg-white/5 rounded text-[--color-text-primary]">Sprint: {meta.sprint}</span>}
+          {meta.sprint_status && <span className="text-[10px] uppercase font-bold text-[--color-text-secondary]">{meta.sprint_status}</span>}
+        </>
+      )
+    case 'LOKAL':
+      return (
+        <>
+          {meta.sales_volume && <span className="text-sm font-bold" style={{ color }}>{meta.sales_volume} Pcs Sold</span>}
+          {meta.top_product && <span className="text-xs text-[--color-text-muted] truncate max-w-[150px]">Top: {meta.top_product}</span>}
+        </>
+      )
+    case 'EVORY':
+      return (
+        <>
+          {meta.event_date && <span className="text-xs text-[--color-text-primary] px-2 py-0.5 bg-white/5 rounded">{meta.event_date}</span>}
+          {meta.vendor_status && <span className="text-[10px] uppercase font-bold text-[--color-text-secondary]">Vendors: {meta.vendor_status}</span>}
+        </>
+      )
+    case 'COLABZ':
+      return (
+        <>
+          {meta.showreel_progress != null && (
+            <div className="w-32">
+              <div className="flex justify-between text-[10px] mb-1">
+                <span className="text-[--color-text-muted]">Showreel</span>
+                <span className="font-bold" style={{ color }}>{meta.showreel_progress}%</span>
+              </div>
+              <div className="h-1 bg-white/10 rounded-full overflow-hidden"><div className="h-full" style={{ width: `${meta.showreel_progress}%`, background: color }} /></div>
+            </div>
+          )}
+        </>
+      )
+    case 'LADDIFY':
+      return (
+        <>
+          {meta.provider && <span className="text-xs font-semibold px-2 py-0.5 bg-white/5 rounded text-[--color-text-primary] truncate max-w-[150px]">{meta.provider}</span>}
+          {meta.margin && <span className="text-[10px] font-bold uppercase text-[--color-text-muted]">Margin: {meta.margin}%</span>}
+        </>
+      )
+    default: // GENERAL
+      return (
+        <>
+          {meta.priority && <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${meta.priority === 'HIGH' ? 'text-red-400 border-red-500/30 bg-red-500/10' : meta.priority === 'MEDIUM' ? 'text-amber-400 border-amber-500/30 bg-amber-500/10' : 'text-blue-400 border-blue-500/30 bg-blue-500/10'}`}>{meta.priority} Priority</span>}
+          {meta.due_date && <span className="text-[10px] text-[--color-text-muted]">Due: {meta.due_date}</span>}
+        </>
+      )
+  }
 }

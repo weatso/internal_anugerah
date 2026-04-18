@@ -4,6 +4,8 @@ export type TransactionType = 'INCOME' | 'EXPENSE'
 export type BillingStatus = 'PENDING' | 'APPROVED'
 export type InvoiceStatus = 'PENDING_APPROVAL' | 'APPROVED' | 'SENT'
 export type LogStatus = 'SUBMITTED' | 'REVIEWED_BY_CEO' | 'NEEDS_ACTION'
+export type WorkspaceType = 'GENERAL' | 'WEATSO' | 'LOKAL' | 'EVORY' | 'COLABZ' | 'LADDIFY'
+export type SalesKitCategory = 'portfolio' | 'pricelist_public' | 'pricelist_internal' | 'brand_asset'
 
 export interface Entity {
   id: string
@@ -85,18 +87,91 @@ export interface LogAttachment {
   size: number
 }
 
+// ─── Workspace Metadata types per division ───────────────────────────────────
+
+export interface GeneralMetadata {
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH'
+  assignee?: string
+  due_date?: string
+}
+
+export interface WeatsoMetadata {
+  sprint?: string
+  github_link?: string
+  tech_stack?: string[]
+  bug_count?: number
+  sprint_status?: 'PLANNING' | 'IN_PROGRESS' | 'REVIEW' | 'DONE'
+}
+
+export interface LokalMetadata {
+  sales_volume?: number
+  top_product?: string
+  stock_alert?: boolean
+  channel?: string
+}
+
+export interface EvoryMetadata {
+  event_date?: string
+  venue?: string
+  vendor_status?: 'PENDING' | 'CONFIRMED' | 'DONE'
+  guest_count?: number
+  guest_star?: string
+}
+
+export interface ColabzMetadata {
+  showreel_progress?: number
+  class_schedule?: string
+  student_count?: number
+  content_type?: string
+}
+
+export interface LaddifyMetadata {
+  provider?: string
+  client_status?: 'ACTIVE' | 'INACTIVE' | 'PROSPECT'
+  margin?: number
+  smm_platform?: string
+}
+
+export type WorkspaceMetadata =
+  | GeneralMetadata
+  | WeatsoMetadata
+  | LokalMetadata
+  | EvoryMetadata
+  | ColabzMetadata
+  | LaddifyMetadata
+
 export interface WorkspaceLog {
   id: string
   entity_id: string
   created_by: string | null
   title: string
   content: string
+  log_type: WorkspaceType
+  metadata: WorkspaceMetadata | null
   attachments: LogAttachment[] | null
   status: LogStatus
   assigned_to: string | null
   deadline: string | null
   ceo_notes: string | null
   reviewed_at: string | null
+  created_at: string
+  entity?: Entity
+  creator?: Profile
+}
+
+// ─── Sales Kit ───────────────────────────────────────────────────────────────
+
+export interface SalesKitItem {
+  id: string
+  entity_id: string | null
+  title: string
+  description: string | null
+  category: SalesKitCategory
+  file_key: string
+  file_size: number | null
+  file_type: string | null
+  is_public: boolean
+  created_by: string | null
   created_at: string
   entity?: Entity
   creator?: Profile

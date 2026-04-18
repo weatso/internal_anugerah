@@ -40,7 +40,7 @@ interface TopbarProps {
 }
 
 export function Topbar({ onMenuClick, sidebarOpen }: TopbarProps) {
-  const { profile } = useUser()
+  const { profile, isImpersonating, effectiveEntity } = useUser()
   const pathname = usePathname()
 
   const roleKey = profile?.role ?? 'STAFF'
@@ -71,6 +71,14 @@ export function Topbar({ onMenuClick, sidebarOpen }: TopbarProps) {
       {/* Right — User info */}
       {profile && (
         <div className="flex items-center gap-3">
+          {/* Impersonation Indicator */}
+          {isImpersonating && effectiveEntity && (
+            <span className="hidden md:inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-[10px] font-bold uppercase tracking-widest bg-emerald-500/10 text-emerald-500 border-emerald-500/30">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Menyamar: {effectiveEntity.name}
+            </span>
+          )}
+
           {/* Role badge */}
           <span className={cn(
             'hidden sm:inline-flex px-2 py-0.5 rounded border text-[10px] font-bold uppercase tracking-widest',
