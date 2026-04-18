@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -28,14 +28,42 @@ const ROLE_BADGE = {
   FINANCE: 'bg-blue-400/10 text-blue-400 border-blue-400/20',
   HEAD: 'bg-purple-400/10 text-purple-400 border-purple-400/20',
   STAFF: 'bg-neutral-400/10 text-neutral-400 border-neutral-400/20',
+  PENDING: 'bg-amber-400/10 text-amber-400 border-amber-400/20',
 }
 
-export function Sidebar() {
+export function Sidebar({ onClose }: { onClose?: () => void }) {
+  const [width, setWidth] = useState(240)
+  const [isResizing, setIsResizing] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
+  
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
   const { profile, loading } = useUser()
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return
+      let newWidth = e.clientX
+      if (newWidth < 200) newWidth = 200
+      if (newWidth > 400) newWidth = 400
+      setWidth(newWidth)
+    }
+
+    const handleMouseUp = () => {
+      setIsResizing(false)
+    }
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [isResizing])
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -47,19 +75,29 @@ export function Sidebar() {
 
   return (
     <motion.aside
-      animate={{ width: collapsed ? 72 : 240 }}
-      transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-      className="relative flex flex-col h-screen shrink-0 bg-[--color-bg-secondary] border-r border-[--color-border] overflow-hidden"
+      animate={{ width: collapsed ? 72 : width }}
+      transition={{ duration: isResizing ? 0 : 0.25, ease: [0.4, 0, 0.2, 1] }}
+      className="relative flex flex-col h-screen shrink-0 bg-[--color-bg-secondary] border-r border-[--color-border] z-30"
     >
+      {/* Resizer Handle */}
+      {!collapsed && (
+        <div 
+          className="absolute right-0 top-0 w-1.5 h-full cursor-col-resize hover:bg-[#D4AF37] transition-colors z-40 active:bg-[#D4AF37]"
+          onMouseDown={(e) => { e.preventDefault(); setIsResizing(true) }}
+        />
+      )}
+
       {/* Toggle Button */}
       <button
         id="sidebar-toggle"
         onClick={() => setCollapsed(!collapsed)}
-        className="absolute -right-3 top-7 z-50 w-6 h-6 rounded-full bg-[--color-bg-elevated] border border-[--color-border] flex items-center justify-center text-[--color-text-muted] hover:text-[--color-text-primary] transition-colors"
+        className="absolute -right-3 top-7 z-50 w-6 h-6 rounded-full bg-[--color-bg-elevated] border border-[--color-border] flex items-center justify-center text-[--color-text-muted] hover:text-[--color-text-primary] hover:border-[#D4AF37]/50 hover:bg-[#D4AF37]/10 transition-all focus:outline-none"
       >
-        {collapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
+        {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
       </button>
 
+      {/* Inner Container to prevent overflow on text but allow toggle to hang out */}
+      <div className="flex flex-col h-full overflow-hidden">
       {/* Logo */}
       <div className="flex items-center gap-3 px-4 py-5 border-b border-[--color-border]">
         <div className="relative w-9 h-9 shrink-0">
@@ -167,6 +205,7 @@ export function Sidebar() {
             )}
           </AnimatePresence>
         </button>
+      </div>
       </div>
     </motion.aside>
   )

@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Profile } from '@/types'
 
@@ -20,6 +21,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
+  const router = useRouter()
+  const pathname = usePathname()
 
   const fetchProfile = useCallback(async () => {
     setLoading(true)
@@ -32,9 +35,18 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       .eq('id', user.id)
       .single()
 
-    setProfile(data as Profile)
+    const loadedProfile = data as Profile
+    setProfile(loadedProfile)
     setLoading(false)
-  }, [supabase])
+
+    // Redirect logic
+    if (loadedProfile?.role === 'PENDING' && pathname !== '/pending') {
+      router.push('/pending')
+    } else if (loadedProfile?.role !== 'PENDING' && pathname === '/pending') {
+      router.push('/dashboard')
+    }
+
+  }, [supabase, pathname, router])
 
   useEffect(() => { fetchProfile() }, [fetchProfile])
 

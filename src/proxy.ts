@@ -28,17 +28,19 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Jika belum login dan mencoba akses portal → redirect ke login
-  if (!user && pathname.startsWith('/') && !pathname.startsWith('/login')) {
+  const publicPaths = ['/login', '/auth', '/welcome']
+  const isPublic = publicPaths.some(p => pathname.startsWith(p))
+  if (!user && !isPublic) {
     const loginUrl = request.nextUrl.clone()
     loginUrl.pathname = '/login'
     return NextResponse.redirect(loginUrl)
   }
 
-  // Jika sudah login dan mencoba akses login → redirect ke dashboard
+  // Jika sudah login dan mencoba akses login → redirect ke welcome
   if (user && pathname === '/login') {
-    const dashboardUrl = request.nextUrl.clone()
-    dashboardUrl.pathname = '/dashboard'
-    return NextResponse.redirect(dashboardUrl)
+    const welcomeUrl = request.nextUrl.clone()
+    welcomeUrl.pathname = '/welcome'
+    return NextResponse.redirect(welcomeUrl)
   }
 
   return supabaseResponse

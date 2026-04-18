@@ -1,5 +1,5 @@
 export type EntityType = 'HOLDING' | 'DIVISION'
-export type UserRole = 'CEO' | 'HEAD' | 'FINANCE' | 'STAFF'
+export type UserRole = 'CEO' | 'HEAD' | 'FINANCE' | 'STAFF' | 'PENDING'
 export type TransactionType = 'INCOME' | 'EXPENSE'
 export type BillingStatus = 'PENDING' | 'APPROVED'
 export type InvoiceStatus = 'PENDING_APPROVAL' | 'APPROVED' | 'SENT'
