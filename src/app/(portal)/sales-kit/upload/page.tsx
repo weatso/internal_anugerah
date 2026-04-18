@@ -52,22 +52,22 @@ export default function SalesKitUploadPage() {
       const uploadRes = await fetch(url, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } })
       if (!uploadRes.ok) throw new Error('Upload gagal')
 
-      // 3. Save to database
-      const saveRes = await fetch('/api/sales-kit/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title,
-          description: description || null,
-          category,
-          file_key: key,
-          file_size: file.size,
-          file_type: file.type,
-          is_public: isPublic,
-          entity_id: effectiveEntityId,
-        }),
+      // 3. Save to database using Supabase Client
+      const { createClient } = await import('@/lib/supabase/client')
+      const supabase = createClient()
+      
+      const { error: sbError } = await supabase.from('sales_kit_items').insert({
+        title,
+        description: description || null,
+        category,
+        file_key: key,
+        file_size: file.size,
+        file_type: file.type,
+        is_public: isPublic,
+        entity_id: effectiveEntityId,
       })
-      if (!saveRes.ok) throw new Error('Gagal menyimpan data')
+      
+      if (sbError) throw sbError
 
       router.push('/sales-kit')
     } catch (err: any) {
