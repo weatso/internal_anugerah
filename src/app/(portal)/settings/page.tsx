@@ -1,298 +1,315 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/components/providers/UserProvider'
-import { formatDateTime, getStatusLabel, cn } from '@/lib/utils'
-import { Plus, Loader2, X, Pencil, Check, Trash2 } from 'lucide-react'
-import type { Entity } from '@/types'
-
-interface UserProfile {
-  id: string
-  entity_id: string
-  full_name: string
-  role: string
-  created_at: string
-  email: string
-  entity_name: string
-  entity_type: string
-}
+import { Entity } from '@/types'
+import { toast } from 'sonner'
+import { 
+  Lock, 
+  Users, 
+  ShieldCheck, 
+  UserPlus, 
+  ChevronRight, 
+  Loader2,
+  Mail,
+  User,
+  Building2,
+  KeyRound
+} from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 
 export default function SettingsPage() {
-  const { profile: currentUser } = useUser()
-  const supabase = createClient()
-  const [profiles, setProfiles] = useState<UserProfile[]>([])
+  const { profile, loading: userLoading } = useUser()
   const [entities, setEntities] = useState<Entity[]>([])
-  const [loading, setLoading] = useState(true)
-  const [showInvite, setShowInvite] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editRole, setEditRole] = useState('')
-  const [editEntityId, setEditEntityId] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [saveMsg, setSaveMsg] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState<'security' | 'team'>('security')
+  const supabase = createClient()
 
-  // Invite form
-  const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteRole, setInviteRole] = useState('STAFF')
-  const [inviteEntity, setInviteEntity] = useState('')
-  const [inviteFullName, setInviteFullName] = useState('')
-  const [invitePassword, setInvitePassword] = useState('')
+  // Form State: Update Password
+  const [passwordForm, setPasswordForm] = useState({
+    newPassword: '',
+    confirmPassword: ''
+  })
 
-  async function fetchData() {
+  // Form State: Manajemen Pengguna
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    full_name: '',
+    role: 'STAFF',
+    entity_id: ''
+  })
+
+  useEffect(() => {
+    async function fetchEntities() {
+      const { data } = await supabase.from('entities').select('*').order('name')
+      if (data) {
+        setEntities(data)
+        if (data.length > 0) setFormData(prev => ({ ...prev, entity_id: data[0].id }))
+      }
+    }
+    if (profile?.role === 'CEO' || profile?.role === 'HEAD') {
+      fetchEntities()
+    }
+  }, [profile, supabase])
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast.error('Password konfirmasi tidak cocok.')
+      return
+    }
+
     setLoading(true)
-    const [{ data: p }, { data: e }] = await Promise.all([
-      // Gunakan view user_profiles yang sudah include email
-      supabase.from('user_profiles').select('*').order('full_name'),
-      supabase.from('entities').select('*').order('name'),
-    ])
-    setProfiles((p ?? []) as UserProfile[])
-    setEntities((e ?? []) as Entity[])
+    const { error } = await supabase.auth.updateUser({ password: passwordForm.newPassword })
+    
+    if (error) {
+      toast.error(error.message)
+    } else {
+      toast.success('Password berhasil diperbarui.')
+      setPasswordForm({ newPassword: '', confirmPassword: '' })
+    }
     setLoading(false)
   }
 
-  useEffect(() => { fetchData() }, [])
-
-  function startEdit(p: UserProfile) {
-    setEditingId(p.id)
-    setEditRole(p.role)
-    setEditEntityId(p.entity_id)
-  }
-
-  async function saveEdit(id: string) {
-    setSubmitting(true)
-    await supabase.from('profiles').update({
-      role: editRole,
-      entity_id: editEntityId,
-    }).eq('id', id)
-    setEditingId(null)
-    setSaveMsg('Berhasil disimpan')
-    setTimeout(() => setSaveMsg(null), 2000)
-    setSubmitting(false)
-    fetchData()
-  }
-
-  async function handleInvite(e: React.FormEvent) {
+  const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault()
-    setSubmitting(true)
-    const res = await fetch('/api/admin/create-user', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: inviteEmail,
-        password: invitePassword,
-        full_name: inviteFullName,
-        role: inviteRole,
-        entity_id: inviteEntity,
-      }),
-    })
-    setSubmitting(false)
-    if (res.ok) {
-      setShowInvite(false)
-      setInviteEmail(''); setInvitePassword(''); setInviteFullName('')
-      setInviteRole('STAFF'); setInviteEntity('')
-      fetchData()
-    } else {
-      const { error } = await res.json()
-      alert(`Gagal: ${error ?? 'Unknown error'}`)
+    setLoading(true)
+
+    try {
+      const res = await fetch('/api/admin/create-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Gagal membuat akun')
+
+      toast.success('Akun tim berhasil diciptakan.')
+      setFormData({ ...formData, email: '', password: '', full_name: '' })
+    } catch (err: any) {
+      toast.error(err.message)
+    } finally {
+      setLoading(false)
     }
   }
 
-  const ROLES = ['CEO', 'HEAD', 'FINANCE', 'STAFF']
-  const ROLE_BADGE: Record<string, string> = {
-    CEO: 'bg-[#D4AF37]/15 text-[#D4AF37] border-[#D4AF37]/30',
-    FINANCE: 'bg-blue-400/10 text-blue-400 border-blue-400/20',
-    HEAD: 'bg-purple-400/10 text-purple-400 border-purple-400/20',
-    STAFF: 'bg-neutral-400/10 text-neutral-400 border-neutral-400/20',
+  if (userLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="w-8 h-8 text-[#D4AF37] animate-spin" />
+      </div>
+    )
   }
 
+  const navItems = [
+    { id: 'security', label: 'Keamanan Akun', icon: Lock, roles: ['ANY'] },
+    { id: 'team', label: 'Manajemen Tim', icon: Users, roles: ['CEO', 'HEAD'] }
+  ].filter(item => item.roles.includes('ANY') || (profile?.role && item.roles.includes(profile.role)))
+
   return (
-    <div className="p-6 md:p-8 space-y-6 animate-[slide-up_0.4s_ease]">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <p className="text-[#D4AF37] text-xs uppercase tracking-[0.3em] font-bold mb-1">Settings</p>
-          <h1 className="text-[--color-text-primary] text-2xl font-black tracking-tight">Manajemen Pengguna</h1>
-          <p className="text-[--color-text-muted] text-sm mt-1">
-            {profiles.length} pengguna terdaftar di sistem.
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {saveMsg && (
-            <span className="text-emerald-400 text-xs flex items-center gap-1">
-              <Check className="w-3 h-3" /> {saveMsg}
-            </span>
-          )}
-          <button onClick={() => setShowInvite(true)}
-            className="flex items-center gap-2 bg-[#D4AF37] text-[#050505] font-bold px-4 py-2 rounded-md text-sm hover:bg-[#F5D678] transition-colors">
-            <Plus className="w-4 h-4" /> Tambah User
-          </button>
-        </div>
-      </div>
-
-      {/* User Table */}
-      <div className="glass-card overflow-hidden">
-        {loading ? (
-          <div className="flex justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-[#D4AF37]" /></div>
-        ) : profiles.length === 0 ? (
-          <div className="py-12 text-center text-[--color-text-muted] text-sm">
-            <p className="mb-2">Belum ada profil pengguna.</p>
-            <p className="text-xs">Pastikan sudah menjalankan <strong>bootstrap_ceo.sql</strong> di Supabase.</p>
+    <div className="max-w-6xl mx-auto p-4 md:p-8">
+      <div className="flex flex-col md:flex-row gap-8">
+        
+        {/* SIDEBAR NAVIGATION */}
+        <aside className="w-full md:w-64 space-y-2">
+          <div className="px-3 mb-6">
+            <h1 className="text-2xl font-bold text-white tracking-tight">Pengaturan</h1>
+            <p className="text-xs text-[--color-text-muted] uppercase tracking-widest mt-1">Sistem Konfigurasi</p>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[--color-border]">
-                  {['Nama', 'Email', 'Divisi', 'Role', 'Bergabung', 'Aksi'].map(h => (
-                    <th key={h} className="text-left px-5 py-3 text-[--color-text-muted] text-xs uppercase tracking-wider font-medium">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[--color-border]">
-                {profiles.map(p => {
-                  const isEditing = editingId === p.id
-                  const isMe = p.id === currentUser?.id
-                  return (
-                    <tr key={p.id} className={cn('hover:bg-white/[0.02] transition-colors', isEditing && 'bg-[#D4AF37]/5')}>
-                      {/* Nama */}
-                      <td className="px-5 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-full bg-[#D4AF37]/15 flex items-center justify-center text-[#D4AF37] text-xs font-bold shrink-0">
-                            {p.full_name.charAt(0).toUpperCase()}
-                          </div>
-                          <div>
-                            <span className="text-[--color-text-primary] font-medium">{p.full_name}</span>
-                            {isMe && <span className="ml-2 text-[10px] text-[#D4AF37] bg-[#D4AF37]/10 px-1.5 py-0.5 rounded">Anda</span>}
-                          </div>
+          <nav className="space-y-1">
+            {navItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id as any)}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-lg transition-all duration-200 group ${
+                  activeTab === item.id 
+                    ? 'bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20' 
+                    : 'text-[--color-text-secondary] hover:bg-white/5 hover:text-white'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <item.icon className={`w-4 h-4 ${activeTab === item.id ? 'text-[#D4AF37]' : 'text-[--color-text-muted] group-hover:text-white'}`} />
+                  <span className="text-sm font-medium">{item.label}</span>
+                </div>
+                {activeTab === item.id && <ChevronRight className="w-4 h-4" />}
+              </button>
+            ))}
+          </nav>
+        </aside>
+
+        {/* CONTENT AREA */}
+        <main className="flex-1 min-w-0">
+          <AnimatePresence mode="wait">
+            {activeTab === 'security' && (
+              <motion.div
+                key="security"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="glass-card border border-white/5 overflow-hidden"
+              >
+                <div className="p-6 border-b border-white/5 bg-white/[0.02]">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400">
+                      <ShieldCheck className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold text-white">Keamanan Akun</h2>
+                      <p className="text-xs text-[--color-text-muted]">Kelola kredensial akses Anda</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="p-8">
+                  <form onSubmit={handleUpdatePassword} className="max-w-md space-y-6">
+                    <div className="space-y-4">
+                      <div className="relative">
+                        <label className="block text-[10px] font-bold text-[--color-text-muted] uppercase tracking-widest mb-1.5 ml-1">Password Baru</label>
+                        <div className="relative group">
+                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[--color-text-muted] group-focus-within:text-[#D4AF37] transition-colors" />
+                          <input 
+                            type="password" 
+                            required 
+                            minLength={6}
+                            className="w-full bg-[--color-bg-elevated] border border-[--color-border] rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:border-[#D4AF37]/50 focus:ring-1 focus:ring-[#D4AF37]/20 focus:outline-none transition-all"
+                            value={passwordForm.newPassword}
+                            onChange={e => setPasswordForm({...passwordForm, newPassword: e.target.value})}
+                            placeholder="••••••••"
+                          />
                         </div>
-                      </td>
-                      {/* Email */}
-                      <td className="px-5 py-3 text-[--color-text-muted] font-mono text-xs">{p.email}</td>
-                      {/* Divisi */}
-                      <td className="px-5 py-3">
-                        {isEditing ? (
-                          <select value={editEntityId} onChange={e => setEditEntityId(e.target.value)}
-                            className="bg-[--color-bg-card] border border-[--color-border] rounded px-2 py-1.5 text-[--color-text-primary] text-xs focus:outline-none focus:border-[#D4AF37]/50 w-full max-w-[160px]">
-                            {entities.map(en => <option key={en.id} value={en.id}>{en.name}</option>)}
-                          </select>
-                        ) : (
-                          <span className="text-[--color-text-secondary]">{p.entity_name ?? '—'}</span>
-                        )}
-                      </td>
-                      {/* Role */}
-                      <td className="px-5 py-3">
-                        {isEditing ? (
-                          <select value={editRole} onChange={e => setEditRole(e.target.value)}
-                            className="bg-[--color-bg-card] border border-[--color-border] rounded px-2 py-1.5 text-[--color-text-primary] text-xs focus:outline-none focus:border-[#D4AF37]/50">
-                            {ROLES.map(r => <option key={r} value={r}>{getStatusLabel(r)}</option>)}
-                          </select>
-                        ) : (
-                          <span className={cn('px-2 py-0.5 rounded border text-xs font-bold uppercase tracking-widest', ROLE_BADGE[p.role] ?? ROLE_BADGE.STAFF)}>
-                            {getStatusLabel(p.role)}
-                          </span>
-                        )}
-                      </td>
-                      {/* Tanggal */}
-                      <td className="px-5 py-3 text-[--color-text-muted] text-xs">{formatDateTime(p.created_at)}</td>
-                      {/* Aksi */}
-                      <td className="px-5 py-3">
-                        {isEditing ? (
-                          <div className="flex items-center gap-2">
-                            <button onClick={() => saveEdit(p.id)} disabled={submitting}
-                              className="flex items-center gap-1 text-xs font-bold text-emerald-400 border border-emerald-400/20 px-2.5 py-1.5 rounded hover:bg-emerald-400/5 transition-all">
-                              {submitting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />} Simpan
-                            </button>
-                            <button onClick={() => setEditingId(null)} className="text-[--color-text-muted] hover:text-[--color-text-primary]">
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        ) : (
-                          <button onClick={() => startEdit(p)}
-                            disabled={isMe}
-                            title={isMe ? 'Tidak bisa edit diri sendiri' : 'Edit role/divisi'}
-                            className="text-[--color-text-muted] hover:text-[#D4AF37] transition-colors disabled:opacity-20 disabled:cursor-not-allowed">
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+                      </div>
 
-      {/* Entities */}
-      <div>
-        <h2 className="text-[--color-text-primary] font-bold mb-3 text-sm">Daftar Entitas / Divisi</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {entities.map(en => (
-            <div key={en.id} className="glass-card p-4">
-              <p className={cn('text-[10px] uppercase tracking-widest mb-1', en.type === 'HOLDING' ? 'text-[#D4AF37]' : 'text-[--color-text-muted]')}>{en.type}</p>
-              <p className="text-[--color-text-primary] font-bold text-sm">{en.name}</p>
-              <p className="text-[--color-text-muted] text-[10px] font-mono mt-1 truncate">{en.id}</p>
-            </div>
-          ))}
-        </div>
-      </div>
+                      <div className="relative">
+                        <label className="block text-[10px] font-bold text-[--color-text-muted] uppercase tracking-widest mb-1.5 ml-1">Konfirmasi Password</label>
+                        <div className="relative group">
+                          <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[--color-text-muted] group-focus-within:text-[#D4AF37] transition-colors" />
+                          <input 
+                            type="password" 
+                            required 
+                            minLength={6}
+                            className="w-full bg-[--color-bg-elevated] border border-[--color-border] rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:border-[#D4AF37]/50 focus:ring-1 focus:ring-[#D4AF37]/20 focus:outline-none transition-all"
+                            value={passwordForm.confirmPassword}
+                            onChange={e => setPasswordForm({...passwordForm, confirmPassword: e.target.value})}
+                            placeholder="••••••••"
+                          />
+                        </div>
+                      </div>
+                    </div>
 
-      {/* Add User Modal */}
-      {showInvite && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="glass-card w-full max-w-md p-6">
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <h2 className="text-[--color-text-primary] font-bold">Tambah User Baru</h2>
-                <p className="text-[--color-text-muted] text-xs mt-0.5">User akan login dengan email + password yang diset di sini.</p>
-              </div>
-              <button onClick={() => setShowInvite(false)} className="text-[--color-text-muted] hover:text-[--color-text-primary]">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <form onSubmit={handleInvite} className="space-y-4">
-              {[
-                { label: 'Nama Lengkap', value: inviteFullName, set: setInviteFullName, placeholder: 'John Doe', type: 'text' },
-                { label: 'Email', value: inviteEmail, set: setInviteEmail, placeholder: 'john@anugerah.id', type: 'email' },
-                { label: 'Password Awal', value: invitePassword, set: setInvitePassword, placeholder: 'Min. 8 karakter', type: 'password' },
-              ].map(f => (
-                <div key={f.label}>
-                  <label className="text-[--color-text-muted] text-xs uppercase tracking-widest mb-1.5 block">{f.label}</label>
-                  <input required type={f.type} value={f.value} onChange={e => f.set(e.target.value)} placeholder={f.placeholder}
-                    className="w-full bg-white/[0.04] border border-[--color-border] rounded-md px-4 py-2.5 text-[--color-text-primary] text-sm focus:outline-none focus:border-[#D4AF37]/50" />
-                </div>
-              ))}
-              <div>
-                <label className="text-[--color-text-muted] text-xs uppercase tracking-widest mb-1.5 block">Divisi</label>
-                <select required value={inviteEntity} onChange={e => setInviteEntity(e.target.value)}
-                  className="w-full bg-[--color-bg-card] border border-[--color-border] rounded-md px-4 py-2.5 text-[--color-text-primary] text-sm focus:outline-none focus:border-[#D4AF37]/50">
-                  <option value="">Pilih divisi...</option>
-                  {entities.map(en => <option key={en.id} value={en.id}>{en.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-[--color-text-muted] text-xs uppercase tracking-widest mb-1.5 block">Role</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {ROLES.map(r => (
-                    <button key={r} type="button" onClick={() => setInviteRole(r)}
-                      className={cn('py-2 rounded-md text-xs font-bold border transition-all uppercase tracking-wider',
-                        inviteRole === r ? ROLE_BADGE[r] : 'border-[--color-border] text-[--color-text-muted] hover:text-[--color-text-primary]')}>
-                      {getStatusLabel(r)}
+                    <button 
+                      type="submit" 
+                      disabled={loading} 
+                      className="inline-flex items-center justify-center gap-2 bg-white/10 hover:bg-white/15 text-white text-[11px] font-bold px-6 py-3 rounded-lg transition-all uppercase tracking-widest disabled:opacity-50"
+                    >
+                      {loading && <Loader2 className="w-3 h-3 animate-spin" />}
+                      Update Password
                     </button>
-                  ))}
+                  </form>
                 </div>
-              </div>
-              <button type="submit" disabled={submitting}
-                className="w-full bg-[#D4AF37] text-[#050505] font-bold py-3 rounded-md text-sm hover:bg-[#F5D678] transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-                {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Membuat...</> : 'Buat User'}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+              </motion.div>
+            )}
+
+            {activeTab === 'team' && (profile?.role === 'CEO' || profile?.role === 'HEAD') && (
+              <motion.div
+                key="team"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="glass-card border border-[#D4AF37]/20 overflow-hidden"
+              >
+                <div className="p-6 border-b border-white/5 bg-white/[0.02]">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-[#D4AF37]/10 text-[#D4AF37]">
+                      <UserPlus className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold gold-text">Manajemen Pengguna</h2>
+                      <p className="text-xs text-[--color-text-muted]">Otoritas tingkat {profile.role === 'CEO' ? 'Holding' : 'Divisi'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-8">
+                  <form onSubmit={handleCreateUser} className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-[--color-text-muted] uppercase tracking-widest ml-1">Informasi Personal</label>
+                        <div className="relative group">
+                          <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[--color-text-muted] group-focus-within:text-[#D4AF37]" />
+                          <input type="text" placeholder="Nama Lengkap" required 
+                            className="w-full bg-[--color-bg-elevated] border border-[--color-border] rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:border-[#D4AF37]/50 focus:outline-none transition-all"
+                            value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-[--color-text-muted] uppercase tracking-widest ml-1">Kredensial Bisnis</label>
+                        <div className="relative group">
+                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[--color-text-muted] group-focus-within:text-[#D4AF37]" />
+                          <input type="email" placeholder="Email Bisnis" required 
+                            className="w-full bg-[--color-bg-elevated] border border-[--color-border] rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:border-[#D4AF37]/50 focus:outline-none transition-all"
+                            value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-[--color-text-muted] uppercase tracking-widest ml-1">Jabatan / Role</label>
+                        <select className="w-full bg-[--color-bg-elevated] border border-[--color-border] rounded-lg px-4 py-2.5 text-sm text-white focus:border-[#D4AF37]/50 focus:outline-none transition-all appearance-none cursor-pointer"
+                          value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})}>
+                          {profile.role === 'CEO' && <option value="HEAD">Head Division</option>}
+                          {profile.role === 'CEO' && <option value="FINANCE">Finance</option>}
+                          {profile.role === 'CEO' && <option value="DESIGN">Design Team</option>}
+                          <option value="STAFF">Staff</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-[--color-text-muted] uppercase tracking-widest ml-1">Penempatan Divisi</label>
+                        <div className="relative">
+                          <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[--color-text-muted] pointer-events-none" />
+                          <select className="w-full bg-[--color-bg-elevated] border border-[--color-border] rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:border-[#D4AF37]/50 focus:outline-none transition-all appearance-none cursor-pointer"
+                            value={formData.entity_id} onChange={e => setFormData({...formData, entity_id: e.target.value})}>
+                            {entities.map(ent => (
+                              <option key={ent.id} value={ent.id}>{ent.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-[--color-text-muted] uppercase tracking-widest ml-1">Password Sementara</label>
+                      <div className="relative group">
+                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[--color-text-muted] group-focus-within:text-[#D4AF37]" />
+                        <input type="text" placeholder="Masukkan password sementara" required minLength={6} 
+                          className="w-full bg-[--color-bg-elevated] border border-[--color-border] rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:border-[#D4AF37]/50 focus:outline-none transition-all"
+                          value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
+                      </div>
+                    </div>
+
+                    <button 
+                      type="submit" 
+                      disabled={loading} 
+                      className="w-full bg-[#D4AF37] hover:bg-[#B8962E] text-black font-bold py-3.5 rounded-lg transition-all disabled:opacity-50 uppercase tracking-[0.2em] text-[11px] shadow-lg shadow-[#D4AF37]/10"
+                    >
+                      {loading ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Memproses...
+                        </span>
+                      ) : 'Ciptakan Akun Tim'}
+                    </button>
+                  </form>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </main>
+      </div>
     </div>
   )
 }

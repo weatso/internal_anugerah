@@ -6,18 +6,18 @@ import { createClient } from '@/lib/supabase/client'
 import type { UserRole } from '@/types'
 
 const ROLE_LABEL: Record<string, string> = {
-  CEO    : 'CEO',
-  HEAD   : 'Head',
+  CEO: 'CEO',
+  HEAD: 'Head',
   FINANCE: 'Finance',
-  STAFF  : 'Staff',
+  STAFF: 'Staff',
   PENDING: 'Pending',
 }
 
 export default function WelcomePage() {
   const router = useRouter()
   const supabase = createClient()
-  const [name, setName]     = useState('')
-  const [role, setRole]     = useState<string>('')
+  const [name, setName] = useState('')
+  const [role, setRole] = useState<string>('')
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
@@ -34,7 +34,11 @@ export default function WelcomePage() {
         .single()
 
       if (cancelled) return
-      if (!profile) { router.replace('/dashboard'); return }
+      if (!profile) {
+        // Jika database gagal/profil kosong, KELUARKAN ke login, jangan teruskan ke dashboard
+        router.replace('/login?error=profile_not_found');
+        return;
+      }
       if (profile.role === 'PENDING') { router.replace('/pending'); return }
 
       setName(profile.full_name.split(' ')[0])
@@ -75,7 +79,7 @@ export default function WelcomePage() {
           className="text-[#D4AF37] text-xs uppercase tracking-[0.35em] font-bold mb-6"
           style={{
             transform: visible ? 'translateY(0)' : 'translateY(16px)',
-            opacity  : visible ? 1 : 0,
+            opacity: visible ? 1 : 0,
             transition: 'transform 0.6s ease, opacity 0.6s ease',
           }}
         >
@@ -88,7 +92,7 @@ export default function WelcomePage() {
             fontSize: 'clamp(2.25rem, 8vw, 4rem)',
             lineHeight: 1.1,
             transform: visible ? 'translateY(0)' : 'translateY(24px)',
-            opacity  : visible ? 1 : 0,
+            opacity: visible ? 1 : 0,
             transition: 'transform 0.7s ease 0.1s, opacity 0.7s ease 0.1s',
           }}
         >
@@ -102,7 +106,7 @@ export default function WelcomePage() {
           className="text-neutral-500 text-sm mt-4"
           style={{
             transform: visible ? 'translateY(0)' : 'translateY(16px)',
-            opacity  : visible ? 1 : 0,
+            opacity: visible ? 1 : 0,
             transition: 'transform 0.7s ease 0.2s, opacity 0.7s ease 0.2s',
           }}
         >

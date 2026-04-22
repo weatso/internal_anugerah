@@ -5,17 +5,18 @@ import { createServiceClient } from '@/lib/supabase/server'
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
-    const { data: { session } } = await supabase.auth.getSession()
+    
+    // PERBAIKAN KEAMANAN: Gunakan getUser(), bukan getSession()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
 
-    if (!session) {
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // 1. Ambil data si Peminta (Siapa yang klik tombol "Buat Akun"?)
     const { data: requester } = await supabase
       .from('profiles')
       .select('role, entity_id')
-      .eq('id', session.user.id)
+      .eq('id', user.id)
       .single()
 
     if (!requester || (requester.role !== 'CEO' && requester.role !== 'HEAD')) {
@@ -23,9 +24,13 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { email, password, role, entity_id } = body
+    // PERBAIKAN FATAL: Tarik full_name dari payload frontend
+    const { email, password, full_name, role, entity_id } = body
 
-    // 2. LOGIKA KEAMANAN: Batasan Wewenang HEAD
+    if (!email || !password || !full_name || !role || !entity_id) {
+      return NextResponse.json({ error: 'Data tidak lengkap' }, { status: 400 })
+    }
+
     if (requester.role === 'HEAD') {
       if (role !== 'STAFF') {
         return NextResponse.json({ error: 'HEAD hanya diizinkan membuat akun STAFF' }, { status: 403 })
@@ -35,28 +40,28 @@ export async function POST(request: Request) {
       }
     }
 
-    // 3. Eksekusi Pembuatan Akun (Hanya sampai sini jika lolos cek di atas)
     const adminAuthClient = createServiceClient()
     
-    const { data: newAuthUser, error: authError } = await adminAuthClient.auth.admin.createUser({
+    const { data: newAuthUser, error: createUserError } = await adminAuthClient.auth.admin.createUser({
       email,
       password,
-      email_confirm: true, // Otomatis terkonfirmasi untuk internal
+      email_confirm: true,
+      user_metadata: { full_name } // Rekam juga di metadata Supabase Auth
     })
 
-    if (authError) throw authError
+    if (createUserError) throw createUserError
 
-    // 4. Inject ke tabel profiles
+    // PERBAIKAN FATAL: Masukkan full_name saat insert
     const { error: profileError } = await adminAuthClient
       .from('profiles')
       .insert({
         id: newAuthUser.user.id,
+        full_name: full_name, 
         role: role,
         entity_id: entity_id,
       })
 
     if (profileError) {
-      // Rollback jika gagal insert profile
       await adminAuthClient.auth.admin.deleteUser(newAuthUser.user.id)
       throw profileError
     }
