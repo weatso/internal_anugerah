@@ -4,6 +4,8 @@ import { useUser } from '@/components/providers/UserProvider'
 import { CEOCommandCenter }      from './components/CEOCommandCenter'
 import { DivisionCommandCenter } from './components/DivisionCommandCenter'
 import { StaffWorkspace }        from './components/StaffWorkspace'
+// Buat file komponen kosong ini nanti di folder components
+import { DesignCommandCenter }   from './components/DesignCommandCenter' 
 
 export default function DashboardPage() {
   const { profile, loading, isImpersonating } = useUser()
@@ -18,12 +20,11 @@ export default function DashboardPage() {
 
   const role = profile?.role
 
-  // CEO tanpa impersonation → Global Command Center
   if (role === 'CEO' && !isImpersonating) return <CEOCommandCenter />
-
-  // CEO sedang impersonate, atau HEAD/FINANCE → Division view
   if (role === 'CEO' || role === 'HEAD' || role === 'FINANCE') return <DivisionCommandCenter />
+  
+  // TAMBAHAN BARU: Routing khusus divisi kreatif
+  if (role === 'DESIGN') return <DesignCommandCenter />
 
-  // STAFF → Workspace-focused
   return <StaffWorkspace />
 }

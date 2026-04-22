@@ -1,45 +1,69 @@
 import { NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 
 export async function POST(request: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  try {
+    const supabase = await createClient()
+    const { data: { session } } = await supabase.auth.getSession()
 
-  // Verify CEO role
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'CEO') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
-  const { email, password, full_name, role, entity_id } = await request.json()
-  if (!email || !password || !full_name || !role || !entity_id) {
-    return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
+    // 1. Ambil data si Peminta (Siapa yang klik tombol "Buat Akun"?)
+    const { data: requester } = await supabase
+      .from('profiles')
+      .select('role, entity_id')
+      .eq('id', session.user.id)
+      .single()
+
+    if (!requester || (requester.role !== 'CEO' && requester.role !== 'HEAD')) {
+      return NextResponse.json({ error: 'Anda tidak memiliki hak membuat akun' }, { status: 403 })
+    }
+
+    const body = await request.json()
+    const { email, password, role, entity_id } = body
+
+    // 2. LOGIKA KEAMANAN: Batasan Wewenang HEAD
+    if (requester.role === 'HEAD') {
+      if (role !== 'STAFF') {
+        return NextResponse.json({ error: 'HEAD hanya diizinkan membuat akun STAFF' }, { status: 403 })
+      }
+      if (entity_id !== requester.entity_id) {
+        return NextResponse.json({ error: 'HEAD tidak bisa menyusupkan staf ke divisi lain' }, { status: 403 })
+      }
+    }
+
+    // 3. Eksekusi Pembuatan Akun (Hanya sampai sini jika lolos cek di atas)
+    const adminAuthClient = createServiceClient()
+    
+    const { data: newAuthUser, error: authError } = await adminAuthClient.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true, // Otomatis terkonfirmasi untuk internal
+    })
+
+    if (authError) throw authError
+
+    // 4. Inject ke tabel profiles
+    const { error: profileError } = await adminAuthClient
+      .from('profiles')
+      .insert({
+        id: newAuthUser.user.id,
+        role: role,
+        entity_id: entity_id,
+      })
+
+    if (profileError) {
+      // Rollback jika gagal insert profile
+      await adminAuthClient.auth.admin.deleteUser(newAuthUser.user.id)
+      throw profileError
+    }
+
+    return NextResponse.json({ success: true, message: 'Akun berhasil dibuat' })
+
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
-
-  const serviceSupabase = createServiceClient()
-  
-  // Buat auth user
-  const { data: newUser, error: authError } = await serviceSupabase.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-  })
-
-  if (authError || !newUser.user) {
-    return NextResponse.json({ error: authError?.message ?? 'Failed to create user' }, { status: 500 })
-  }
-
-  // Insert profile
-  const { error: profileError } = await serviceSupabase.from('profiles').insert({
-    id: newUser.user.id,
-    full_name,
-    role,
-    entity_id,
-  })
-
-  if (profileError) {
-    return NextResponse.json({ error: profileError.message }, { status: 500 })
-  }
-
-  return NextResponse.json({ success: true, user_id: newUser.user.id })
 }

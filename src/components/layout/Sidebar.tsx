@@ -17,20 +17,20 @@ import { getEntityAccentColor } from '@/lib/division-config'
 import Image from 'next/image'
 
 const NAV_ITEMS = [
-  { href: '/dashboard',                label: 'Dashboard',        icon: LayoutDashboard, roles: ['CEO','FINANCE','HEAD','STAFF'] },
-  { href: '/finance',                  label: 'Finance',          icon: TrendingUp,       roles: ['CEO','FINANCE','HEAD','STAFF'] },
-  { href: '/finance/transfer-pricing', label: 'Transfer Pricing', icon: ArrowLeftRight,   roles: ['CEO','FINANCE'] },
-  { href: '/invoicing',                label: 'Invoicing',        icon: FileText,         roles: ['CEO','FINANCE','HEAD','STAFF'] },
-  { href: '/workspace',                label: 'Workspace',        icon: FolderKanban,     roles: ['CEO','FINANCE','HEAD','STAFF'] },
-  { href: '/sales-kit',                label: 'Sales Kit',        icon: Briefcase,        roles: ['CEO','HEAD'] },
-  { href: '/settings',                 label: 'Settings',         icon: Settings,         roles: ['CEO'] },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['CEO', 'FINANCE', 'HEAD', 'STAFF'] },
+  { href: '/finance', label: 'Finance', icon: TrendingUp, roles: ['CEO', 'FINANCE', 'HEAD', 'STAFF'] },
+  { href: '/finance/transfer-pricing', label: 'Transfer Pricing', icon: ArrowLeftRight, roles: ['CEO', 'FINANCE'] },
+  { href: '/invoicing', label: 'Invoicing', icon: FileText, roles: ['CEO', 'FINANCE', 'HEAD', 'STAFF'] },
+  { href: '/workspace', label: 'Workspace', icon: FolderKanban, roles: ['CEO', 'FINANCE', 'HEAD', 'STAFF'] },
+  { href: '/sales-kit', label: 'Sales Kit', icon: Briefcase, roles: ['CEO', 'HEAD'] },
+  { href: '/settings', label: 'Settings', icon: Settings, roles: ['CEO'] },
 ]
 
 const ROLE_BADGE: Record<string, string> = {
-  CEO:     'bg-amber-500/15 text-amber-500 border-amber-500/30',
+  CEO: 'bg-amber-500/15 text-amber-500 border-amber-500/30',
   FINANCE: 'bg-blue-400/10 text-blue-400 border-blue-400/20',
-  HEAD:    'bg-purple-400/10 text-purple-400 border-purple-400/20',
-  STAFF:   'bg-neutral-400/10 text-neutral-400 border-neutral-400/20',
+  HEAD: 'bg-purple-400/10 text-purple-400 border-purple-400/20',
+  STAFF: 'bg-neutral-400/10 text-neutral-400 border-neutral-400/20',
   PENDING: 'bg-amber-400/10 text-amber-400 border-amber-400/20',
 }
 
@@ -42,7 +42,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
-  const { profile, loading, isImpersonating, impersonatedEntity, stopImpersonating, effectiveEntity } = useUser()
+  const { profile, loading, isImpersonating, effectiveEntity, impersonate } = useUser()
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -71,7 +71,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
 
   // Dynamic accent: impersonated or own entity color
   const accentColor = isImpersonating
-    ? getEntityAccentColor(impersonatedEntity)
+    ? getEntityAccentColor(effectiveEntity)
     : (effectiveEntity?.primary_color ?? '#D4AF37')
 
   return (
@@ -136,12 +136,12 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                       Menyamar sebagai
                     </p>
                   </div>
-                  <button onClick={stopImpersonating} className="text-[--color-text-muted] hover:text-white transition-colors">
+                  <button onClick={() => impersonate(null)} className="text-[--color-text-muted] hover:text-white transition-colors">
                     <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
-                <p className="text-[--color-text-primary] font-bold text-sm">{impersonatedEntity?.name}</p>
-                <button onClick={stopImpersonating}
+                <p className="text-[--color-text-primary] font-bold text-sm">{effectiveEntity?.name}</p>
+                <button onClick={() => impersonate(null)}
                   className="text-[10px] font-semibold mt-1.5 hover:underline"
                   style={{ color: accentColor }}>
                   ← Kembali ke Global View

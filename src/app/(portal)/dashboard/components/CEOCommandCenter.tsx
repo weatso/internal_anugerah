@@ -236,7 +236,7 @@ export function CEOCommandCenter() {
                 key={entity.id}
                 whileHover={{ scale: 1.02, y: -2 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => impersonate(entity)}
+                onClick={() => impersonate(entity.id)}
                 className="glass-card p-4 text-left group cursor-pointer transition-all hover:border-opacity-60"
                 style={{ borderColor: `${color}30` }}
               >
