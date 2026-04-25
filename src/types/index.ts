@@ -2,6 +2,7 @@ export type EntityType = 'HOLDING' | 'DIVISION'
 export type UserRole = 'CEO' | 'HEAD' | 'FINANCE' | 'DESIGN' | 'STAFF'
 export type TransactionType = 'INCOME' | 'EXPENSE'
 export type BillingStatus = 'PENDING' | 'APPROVED'
+export type ApprovalStatus = 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED'
 export type InvoiceStatus = 'PENDING_APPROVAL' | 'APPROVED' | 'SENT'
 export type LogStatus = 'SUBMITTED' | 'REVIEWED_BY_CEO' | 'NEEDS_ACTION'
 export type WorkspaceType = 'GENERAL' | 'WEATSO' | 'LOKAL' | 'EVORY' | 'COLABZ' | 'LADDIFY'
@@ -25,19 +26,74 @@ export interface Profile {
   entity?: Entity
 }
 
-export interface Transaction {
+export type AccountClass = 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'COGS' | 'EXPENSE'
+
+export interface ChartOfAccount {
   id: string
+  account_class: AccountClass
+  account_code: string
+  account_name: string
+  is_bank: boolean
+  is_active: boolean
+  created_at: string
+}
+
+export interface DivisionFinancialSetting {
   entity_id: string
-  type: TransactionType
-  amount: number
-  category: string
-  description: string | null
+  monthly_auto_approve_limit: number
+  current_month_usage: number
+  last_reset_month: string
+  updated_at: string
+  entity?: Entity
+}
+
+export interface JournalEntry {
+  id: string
+  transaction_date: string
+  reference_number: string
+  description: string
+  entity_id: string
   proof_storage_key: string | null
+  status: ApprovalStatus
   created_by: string | null
-  source_billing_id: string | null
+  approved_by: string | null
   created_at: string
   entity?: Entity
   creator?: Profile
+  approver?: Profile
+  lines?: JournalLine[]
+}
+
+export interface JournalLine {
+  id: string
+  journal_id: string
+  account_id: string
+  debit: number
+  credit: number
+  created_at: string
+  account?: ChartOfAccount
+}
+
+export interface Stakeholder {
+  id: string
+  name: string
+  type: 'OWNER' | 'INVESTOR'
+  equity_percentage: number
+  profit_split_percentage: number
+  is_active: boolean
+  created_at: string
+}
+
+export interface DividendDistribution {
+  id: string
+  stakeholder_id: string
+  period_month: string
+  net_profit_amount: number
+  distributed_amount: number
+  journal_id: string | null
+  created_at: string
+  stakeholder?: Stakeholder
+  journal?: JournalEntry
 }
 
 export interface InvoiceItem {
@@ -69,17 +125,18 @@ export interface Invoice {
 
 export interface InternalBilling {
   id: string
-  source_transaction_id: string | null
-  from_entity: string
-  to_entity: string
+  from_entity_id: string
+  to_entity_id: string
   amount: number
-  description: string | null
-  status: BillingStatus
-  approved_at: string | null
+  description: string
+  status: ApprovalStatus
+  created_by: string | null
   approved_by: string | null
   created_at: string
   from_entity_data?: Entity
   to_entity_data?: Entity
+  creator?: Profile
+  approver?: Profile
 }
 
 export interface LogAttachment {

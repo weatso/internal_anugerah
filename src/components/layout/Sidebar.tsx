@@ -15,7 +15,6 @@ import Image from 'next/image'
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['CEO','FINANCE','HEAD','STAFF','DESIGN'] },
   { href: '/finance', label: 'Finance', icon: TrendingUp, roles: ['CEO','FINANCE','HEAD'] },
-  { href: '/finance/transfer-pricing', label: 'Transfer Pricing', icon: ArrowLeftRight, roles: ['CEO','FINANCE','HEAD'] },
   { href: '/invoicing', label: 'Invoicing', icon: FileText, roles: ['CEO','FINANCE','HEAD'] },
   { href: '/workspace', label: 'Workspace', icon: FolderKanban, roles: ['CEO','FINANCE','HEAD','STAFF','DESIGN'] },
   { href: '/sales-kit', label: 'Sales Kit', icon: Briefcase, roles: ['CEO','HEAD','DESIGN'] },

@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ChevronRight, LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -15,17 +16,20 @@ export function Topbar() {
       {/* Breadcrumbs sebagai penanda navigasi tunggal */}
       <div className="flex items-center gap-2">
         <span className="text-[10px] uppercase tracking-[0.2em] text-gray-600 font-bold">Portal</span>
-        {segments.map((segment, index) => (
-          <div key={index} className="flex items-center gap-2">
-            <ChevronRight size={10} className="text-gray-800" />
-            <span className={cn(
-              "text-[10px] uppercase tracking-[0.2em] font-bold",
-              index === segments.length - 1 ? "text-[#C5A028]" : "text-gray-400"
-            )}>
-              {segment.replace(/-/g, ' ')}
-            </span>
-          </div>
-        ))}
+        {segments.map((segment, index) => {
+          const href = '/' + segments.slice(0, index + 1).join('/')
+          return (
+            <div key={index} className="flex items-center gap-2">
+              <ChevronRight size={10} className="text-gray-800" />
+              <Link href={href} className={cn(
+                "text-[10px] uppercase tracking-[0.2em] font-bold hover:text-white transition-colors",
+                index === segments.length - 1 ? "text-[#C5A028]" : "text-gray-400"
+              )}>
+                {segment.replace(/-/g, ' ')}
+              </Link>
+            </div>
+          )
+        })}
       </div>
       
       {/* Elemen Kanan Minimalis */}
