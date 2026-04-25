@@ -1,108 +1,38 @@
 'use client'
 
-import { useState } from 'react'
 import { usePathname } from 'next/navigation'
-import { Menu, X, Bell } from 'lucide-react'
-import { useUser } from '@/components/providers/UserProvider'
+import { ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-const ROLE_LABEL: Record<string, string> = {
-  CEO    : 'CEO',
-  HEAD   : 'Head',
-  FINANCE: 'Finance',
-  STAFF  : 'Staff',
-  PENDING: 'Pending',
-}
-
-const ROLE_BADGE: Record<string, string> = {
-  CEO    : 'bg-amber-500/10 text-amber-500 border-amber-500/30',
-  FINANCE: 'bg-blue-400/10 text-blue-400 border-blue-400/20',
-  HEAD   : 'bg-purple-400/10 text-purple-400 border-purple-400/20',
-  STAFF  : 'bg-neutral-400/10 text-neutral-400 border-neutral-400/20',
-  PENDING: 'bg-amber-400/10 text-amber-400 border-amber-400/20',
-}
-
-const PAGE_TITLES: Record<string, string> = {
-  '/dashboard'                 : 'Dashboard',
-  '/finance'                   : 'Finance',
-  '/finance/transactions'      : 'Transaksi',
-  '/finance/transfer-pricing'  : 'Transfer Pricing',
-  '/invoicing'                 : 'Invoicing',
-  '/invoicing/create'          : 'Buat Invoice',
-  '/workspace'                 : 'Workspace',
-  '/settings'                  : 'Settings',
-  '/pending'                   : 'Menunggu Akses',
-}
-
-interface TopbarProps {
-  onMenuClick: () => void
-  sidebarOpen: boolean
-}
-
-export function Topbar({ onMenuClick, sidebarOpen }: TopbarProps) {
-  const { profile, isImpersonating, effectiveEntity } = useUser()
+export function Topbar() {
   const pathname = usePathname()
-
-  const roleKey = profile?.role ?? 'STAFF'
-  const pageTitle = PAGE_TITLES[pathname] ?? 'Anugerah OS'
+  const segments = pathname.split('/').filter(Boolean)
 
   return (
-    <header className="h-14 shrink-0 flex items-center justify-between px-4 border-b border-[--color-border] bg-[--color-bg-secondary]/80 backdrop-blur-sm sticky top-0 z-20">
-
-      {/* Left — Mobile menu + page title */}
-      <div className="flex items-center gap-3">
-        {/* Hamburger — only mobile */}
-        <button
-          onClick={onMenuClick}
-          className="lg:hidden w-8 h-8 flex items-center justify-center rounded-md text-[--color-text-muted] hover:text-[--color-text-primary] hover:bg-white/5 transition-all"
-          aria-label="Toggle sidebar"
-        >
-          {sidebarOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
-        </button>
-
-        <div>
-          <p className="text-[--color-text-muted] text-[10px] uppercase tracking-[0.25em] hidden sm:block">
-            Anugerah OS
-          </p>
-          <p className="text-[--color-text-primary] font-bold text-sm leading-tight">{pageTitle}</p>
+    <header className="h-16 border-b border-white/5 bg-[#050505]/50 backdrop-blur-xl flex items-center justify-between px-8">
+      {/* Breadcrumbs sebagai penanda navigasi tunggal */}
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] uppercase tracking-[0.2em] text-gray-600 font-bold">Portal</span>
+        {segments.map((segment, index) => (
+          <div key={index} className="flex items-center gap-2">
+            <ChevronRight size={10} className="text-gray-800" />
+            <span className={cn(
+              "text-[10px] uppercase tracking-[0.2em] font-bold",
+              index === segments.length - 1 ? "text-[#C5A028]" : "text-gray-400"
+            )}>
+              {segment.replace(/-/g, ' ')}
+            </span>
+          </div>
+        ))}
+      </div>
+      
+      {/* Elemen Kanan Minimalis */}
+      <div className="flex items-center gap-6">
+        <div className="h-4 w-[1px] bg-white/10" />
+        <div className="text-[9px] text-gray-600 font-mono tracking-widest uppercase">
+          System Core v1.0.4
         </div>
       </div>
-
-      {/* Right — User info */}
-      {profile && (
-        <div className="flex items-center gap-3">
-          {/* Impersonation Indicator */}
-          {isImpersonating && effectiveEntity && (
-            <span className="hidden md:inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-[10px] font-bold uppercase tracking-widest bg-emerald-500/10 text-emerald-500 border-emerald-500/30">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Menyamar: {effectiveEntity.name}
-            </span>
-          )}
-
-          {/* Role badge */}
-          <span className={cn(
-            'hidden sm:inline-flex px-2 py-0.5 rounded border text-[10px] font-bold uppercase tracking-widest',
-            ROLE_BADGE[roleKey]
-          )}>
-            {ROLE_LABEL[roleKey]}
-          </span>
-
-          {/* Name + Avatar */}
-          <div className="flex items-center gap-2">
-            <div className="hidden sm:block text-right">
-              <p className="text-[--color-text-primary] text-xs font-semibold leading-tight">
-                {profile.full_name}
-              </p>
-              <p className="text-[--color-text-muted] text-[10px] leading-tight">
-                {profile.entity?.name ?? 'Anugerah Ventures'}
-              </p>
-            </div>
-            <div className="w-8 h-8 rounded-full bg-[#D4AF37]/20 flex items-center justify-center text-[#D4AF37] font-bold text-xs shrink-0 ring-1 ring-[#D4AF37]/20">
-              {profile.full_name.charAt(0).toUpperCase()}
-            </div>
-          </div>
-        </div>
-      )}
     </header>
   )
 }
