@@ -20,14 +20,16 @@
 /* 2. BASE LAYER
   Mengunci tipografi dan latar belakang kanvas utama.
 */
+/* ... (@theme biarkan seperti sebelumnya) ... */
+
 @layer base {
   html, body {
-    @apply bg-[--color-bg-primary] text-white antialiased;
-    /* Letter spacing minus menciptakan ilusi tipografi publikasi finansial premium */
+    /* Gunakan nilai absolut di sini agar layar tidak akan pernah menjadi putih meskipun Tailwind lag */
+    background-color: #050505; 
+    color: #ffffff;
     letter-spacing: -0.01em; 
   }
 
-  /* Kustomisasi scrollbar agar tidak merusak tema gelap */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -43,6 +45,8 @@
     background: rgba(255, 255, 255, 0.2);
   }
 }
+
+/* ... (lanjutkan layer components seperti sebelumnya) ... */
 
 /* 3. COMPONENT LAYER
   Komponen UI yang dapat digunakan berulang tanpa kode panjang di HTML.

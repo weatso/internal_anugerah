@@ -19,6 +19,7 @@ export interface Profile {
   id: string
   entity_id: string
   full_name: string
+  avatar_url?: string | null
   role: UserRole
   created_at: string
   entity?: Entity

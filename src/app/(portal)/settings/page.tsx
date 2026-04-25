@@ -1,58 +1,47 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/components/providers/UserProvider'
-import { Entity } from '@/types'
 import { toast } from 'sonner'
 import { 
   Lock, 
-  Users, 
   ShieldCheck, 
-  UserPlus, 
   ChevronRight, 
   Loader2,
-  Mail,
   User,
-  Building2,
-  KeyRound
+  KeyRound,
+  UploadCloud,
+  Image as ImageIcon
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 export default function SettingsPage() {
   const { profile, loading: userLoading } = useUser()
-  const [entities, setEntities] = useState<Entity[]>([])
   const [loading, setLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState<'security' | 'team'>('security')
+  const [activeTab, setActiveTab] = useState<'profile' | 'security'>('profile')
   const supabase = createClient()
 
-  // Form State: Update Password
+  const [profileForm, setProfileForm] = useState({
+    full_name: '',
+    avatar_url: ''
+  })
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (profile) {
+      setProfileForm({
+        full_name: profile.full_name || '',
+        avatar_url: profile.avatar_url || ''
+      })
+    }
+  }, [profile])
+
   const [passwordForm, setPasswordForm] = useState({
     newPassword: '',
     confirmPassword: ''
   })
-
-  // Form State: Manajemen Pengguna
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    full_name: '',
-    role: 'STAFF',
-    entity_id: ''
-  })
-
-  useEffect(() => {
-    async function fetchEntities() {
-      const { data } = await supabase.from('entities').select('*').order('name')
-      if (data) {
-        setEntities(data)
-        if (data.length > 0) setFormData(prev => ({ ...prev, entity_id: data[0].id }))
-      }
-    }
-    if (profile?.role === 'CEO' || profile?.role === 'HEAD') {
-      fetchEntities()
-    }
-  }, [profile, supabase])
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -73,25 +62,48 @@ export default function SettingsPage() {
     setLoading(false)
   }
 
-  const handleCreateUser = async (e: React.FormEvent) => {
+  const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+    const { error } = await supabase.from('profiles').update({
+      full_name: profileForm.full_name,
+      avatar_url: profileForm.avatar_url
+    }).eq('id', profile?.id)
+    
+    if (error) {
+      toast.error(error.message)
+    } else {
+      toast.success('Profil berhasil diperbarui.')
+      setTimeout(() => window.location.reload(), 1000)
+    }
+    setLoading(false)
+  }
+
+  const handleFileUpload = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast.error('File harus berupa gambar')
+      return
+    }
+    setUploadingAvatar(true)
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('folder', 'avatars')
+    formData.append('entity_id', profile?.id || 'general')
 
     try {
-      const res = await fetch('/api/admin/create-user', {
+      const res = await fetch('/api/storage/upload', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: formData
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Gagal membuat akun')
-
-      toast.success('Akun tim berhasil diciptakan.')
-      setFormData({ ...formData, email: '', password: '', full_name: '' })
+      if (!res.ok) throw new Error(data.error)
+      
+      setProfileForm(prev => ({ ...prev, avatar_url: data.key }))
+      toast.success('Foto berhasil diunggah. Jangan lupa simpan profil.')
     } catch (err: any) {
-      toast.error(err.message)
+      toast.error(err.message || 'Gagal mengunggah foto')
     } finally {
-      setLoading(false)
+      setUploadingAvatar(false)
     }
   }
 
@@ -104,9 +116,15 @@ export default function SettingsPage() {
   }
 
   const navItems = [
-    { id: 'security', label: 'Keamanan Akun', icon: Lock, roles: ['ANY'] },
-    { id: 'team', label: 'Manajemen Tim', icon: Users, roles: ['CEO', 'HEAD'] }
-  ].filter(item => item.roles.includes('ANY') || (profile?.role && item.roles.includes(profile.role)))
+    { id: 'profile', label: 'Profil Pengguna', icon: User },
+    { id: 'security', label: 'Keamanan Akun', icon: Lock }
+  ]
+
+  const getAvatarSrc = (key: string) => {
+    if (!key) return null
+    if (key.startsWith('http')) return key
+    return `/api/storage/file?key=${encodeURIComponent(key)}`
+  }
 
   return (
     <div className="max-w-6xl mx-auto p-4 md:p-8">
@@ -116,7 +134,7 @@ export default function SettingsPage() {
         <aside className="w-full md:w-64 space-y-2">
           <div className="px-3 mb-6">
             <h1 className="text-2xl font-bold text-white tracking-tight">Pengaturan</h1>
-            <p className="text-xs text-[--color-text-muted] uppercase tracking-widest mt-1">Sistem Konfigurasi</p>
+            <p className="text-xs text-[--color-text-muted] uppercase tracking-widest mt-1">Konfigurasi Personal</p>
           </div>
           <nav className="space-y-1">
             {navItems.map((item) => (
@@ -142,6 +160,96 @@ export default function SettingsPage() {
         {/* CONTENT AREA */}
         <main className="flex-1 min-w-0">
           <AnimatePresence mode="wait">
+            {activeTab === 'profile' && (
+              <motion.div
+                key="profile"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="glass-card border border-white/5 overflow-hidden"
+              >
+                <div className="p-6 border-b border-white/5 bg-white/[0.02]">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-[#C5A028]/10 text-[#C5A028]">
+                      <User className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold text-white">Profil Pengguna</h2>
+                      <p className="text-xs text-[--color-text-muted]">Ubah nama dan foto profil Anda</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="p-8">
+                  <form onSubmit={handleUpdateProfile} className="max-w-md space-y-6">
+                    <div className="space-y-6">
+                      
+                      {/* Avatar Upload (Drag & Drop) */}
+                      <div className="space-y-1.5">
+                        <label className="block text-[10px] font-bold text-[--color-text-muted] uppercase tracking-widest ml-1">Foto Profil</label>
+                        <div 
+                          className={`relative flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-xl transition-all cursor-pointer bg-[--color-bg-elevated]
+                            ${uploadingAvatar ? 'border-[#D4AF37]/50 bg-[#D4AF37]/5' : 'border-[--color-border] hover:border-[#D4AF37]/50'}`}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={(e) => {
+                            e.preventDefault()
+                            if (e.dataTransfer.files?.[0]) handleFileUpload(e.dataTransfer.files[0])
+                          }}
+                          onClick={() => fileInputRef.current?.click()}
+                        >
+                          <input type="file" className="hidden" ref={fileInputRef} accept="image/*"
+                            onChange={(e) => {
+                              if (e.target.files?.[0]) handleFileUpload(e.target.files[0])
+                            }} />
+                          
+                          {uploadingAvatar ? (
+                            <Loader2 className="w-8 h-8 text-[#D4AF37] animate-spin mb-2" />
+                          ) : profileForm.avatar_url ? (
+                            <div className="relative w-20 h-20 rounded-full overflow-hidden mb-3 border-2 border-white/10">
+                              <img src={getAvatarSrc(profileForm.avatar_url)!} alt="Avatar" className="w-full h-full object-cover" />
+                            </div>
+                          ) : (
+                            <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-3">
+                              <UploadCloud className="w-5 h-5 text-[--color-text-muted]" />
+                            </div>
+                          )}
+                          <p className="text-sm font-bold text-white mb-1">
+                            {uploadingAvatar ? 'Mengunggah...' : 'Klik atau Drag file foto'}
+                          </p>
+                          <p className="text-xs text-[--color-text-muted]">Maks 2MB (JPG/PNG)</p>
+                        </div>
+                      </div>
+
+                      <div className="relative">
+                        <label className="block text-[10px] font-bold text-[--color-text-muted] uppercase tracking-widest mb-1.5 ml-1">Nama Lengkap</label>
+                        <div className="relative group">
+                          <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[--color-text-muted] group-focus-within:text-[#D4AF37] transition-colors" />
+                          <input 
+                            type="text" 
+                            required 
+                            className="w-full bg-[--color-bg-elevated] border border-[--color-border] rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:border-[#D4AF37]/50 focus:ring-1 focus:ring-[#D4AF37]/20 focus:outline-none transition-all"
+                            value={profileForm.full_name}
+                            onChange={e => setProfileForm({...profileForm, full_name: e.target.value})}
+                            placeholder="Nama Anda"
+                          />
+                        </div>
+                      </div>
+
+                    </div>
+
+                    <button 
+                      type="submit" 
+                      disabled={loading || uploadingAvatar} 
+                      className="inline-flex items-center justify-center gap-2 bg-[#D4AF37] hover:bg-[#B8962E] text-black text-[11px] font-bold px-6 py-3 rounded-lg transition-all uppercase tracking-widest disabled:opacity-50 shadow-lg shadow-[#D4AF37]/10"
+                    >
+                      {loading && <Loader2 className="w-3 h-3 animate-spin" />}
+                      Simpan Profil
+                    </button>
+                  </form>
+                </div>
+              </motion.div>
+            )}
+
             {activeTab === 'security' && (
               <motion.div
                 key="security"
@@ -211,102 +319,6 @@ export default function SettingsPage() {
               </motion.div>
             )}
 
-            {activeTab === 'team' && (profile?.role === 'CEO' || profile?.role === 'HEAD') && (
-              <motion.div
-                key="team"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="glass-card border border-[#D4AF37]/20 overflow-hidden"
-              >
-                <div className="p-6 border-b border-white/5 bg-white/[0.02]">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-[#D4AF37]/10 text-[#D4AF37]">
-                      <UserPlus className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-bold gold-text">Manajemen Pengguna</h2>
-                      <p className="text-xs text-[--color-text-muted]">Otoritas tingkat {profile.role === 'CEO' ? 'Holding' : 'Divisi'}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-8">
-                  <form onSubmit={handleCreateUser} className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-[--color-text-muted] uppercase tracking-widest ml-1">Informasi Personal</label>
-                        <div className="relative group">
-                          <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[--color-text-muted] group-focus-within:text-[#D4AF37]" />
-                          <input type="text" placeholder="Nama Lengkap" required 
-                            className="w-full bg-[--color-bg-elevated] border border-[--color-border] rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:border-[#D4AF37]/50 focus:outline-none transition-all"
-                            value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} />
-                        </div>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-[--color-text-muted] uppercase tracking-widest ml-1">Kredensial Bisnis</label>
-                        <div className="relative group">
-                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[--color-text-muted] group-focus-within:text-[#D4AF37]" />
-                          <input type="email" placeholder="Email Bisnis" required 
-                            className="w-full bg-[--color-bg-elevated] border border-[--color-border] rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:border-[#D4AF37]/50 focus:outline-none transition-all"
-                            value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-[--color-text-muted] uppercase tracking-widest ml-1">Jabatan / Role</label>
-                        <select className="w-full bg-[--color-bg-elevated] border border-[--color-border] rounded-lg px-4 py-2.5 text-sm text-white focus:border-[#D4AF37]/50 focus:outline-none transition-all appearance-none cursor-pointer"
-                          value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})}>
-                          {profile.role === 'CEO' && <option value="HEAD">Head Division</option>}
-                          {profile.role === 'CEO' && <option value="FINANCE">Finance</option>}
-                          {profile.role === 'CEO' && <option value="DESIGN">Design Team</option>}
-                          <option value="STAFF">Staff</option>
-                        </select>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-[--color-text-muted] uppercase tracking-widest ml-1">Penempatan Divisi</label>
-                        <div className="relative">
-                          <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[--color-text-muted] pointer-events-none" />
-                          <select className="w-full bg-[--color-bg-elevated] border border-[--color-border] rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:border-[#D4AF37]/50 focus:outline-none transition-all appearance-none cursor-pointer"
-                            value={formData.entity_id} onChange={e => setFormData({...formData, entity_id: e.target.value})}>
-                            {entities.map(ent => (
-                              <option key={ent.id} value={ent.id}>{ent.name}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-[--color-text-muted] uppercase tracking-widest ml-1">Password Sementara</label>
-                      <div className="relative group">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[--color-text-muted] group-focus-within:text-[#D4AF37]" />
-                        <input type="text" placeholder="Masukkan password sementara" required minLength={6} 
-                          className="w-full bg-[--color-bg-elevated] border border-[--color-border] rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:border-[#D4AF37]/50 focus:outline-none transition-all"
-                          value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
-                      </div>
-                    </div>
-
-                    <button 
-                      type="submit" 
-                      disabled={loading} 
-                      className="w-full bg-[#D4AF37] hover:bg-[#B8962E] text-black font-bold py-3.5 rounded-lg transition-all disabled:opacity-50 uppercase tracking-[0.2em] text-[11px] shadow-lg shadow-[#D4AF37]/10"
-                    >
-                      {loading ? (
-                        <span className="flex items-center justify-center gap-2">
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Memproses...
-                        </span>
-                      ) : 'Ciptakan Akun Tim'}
-                    </button>
-                  </form>
-                </div>
-              </motion.div>
-            )}
           </AnimatePresence>
         </main>
       </div>
