@@ -23,7 +23,7 @@ const NAV_ITEMS = [
   { href: '/invoicing', label: 'Invoicing', icon: FileText, roles: ['CEO', 'FINANCE', 'HEAD', 'STAFF'] },
   { href: '/workspace', label: 'Workspace', icon: FolderKanban, roles: ['CEO', 'FINANCE', 'HEAD', 'STAFF'] },
   { href: '/sales-kit', label: 'Sales Kit', icon: Briefcase, roles: ['CEO', 'HEAD'] },
-  { href: '/settings', label: 'Settings', icon: Settings, roles: ['CEO'] },
+  { href: '/settings', label: 'Settings', icon: Settings, roles: ['CEO', 'HEAD'] },
 ]
 
 const ROLE_BADGE: Record<string, string> = {
