@@ -11,7 +11,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/components/providers/UserProvider'
 import { formatRupiah, formatDate } from '@/lib/utils'
 import { getEntityAccentColor, getDivisionConfig } from '@/lib/division-config'
-import type { Entity, Transaction } from '@/types'
+import type { Entity, JournalEntry } from '@/types'
 
 interface MonthlyPoint {
   month: string
@@ -52,33 +52,38 @@ export function CEOCommandCenter() {
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
 
     const [
-      { data: txAll },
+      { data: journalAll },
       { data: entitiesData },
       { count: invCount },
       { count: logCount },
     ] = await Promise.all([
       supabase
-        .from('transactions')
-        .select('*, entity:entities(id,name,type,primary_color,logo_key)')
-        .gte('created_at', sixMonthsAgo.toISOString()),
+        .from('journal_entries')
+        .select('*, entity:entities(id,name,type,primary_color,logo_key), lines:journal_lines(*, account:chart_of_accounts(*))')
+        .eq('status', 'APPROVED')
+        .gte('transaction_date', sixMonthsAgo.toISOString().split('T')[0]),
       supabase.from('entities').select('*').order('type').order('name'),
       supabase.from('invoices').select('id', { count: 'exact', head: true }).eq('status', 'PENDING_APPROVAL'),
       supabase.from('workspace_logs').select('id', { count: 'exact', head: true }).eq('status', 'SUBMITTED'),
     ])
 
-    const txData = (txAll ?? []) as Transaction[]
+    const journals = (journalAll ?? []) as JournalEntry[]
     const divEntities = (entitiesData ?? []) as Entity[]
     setEntities(divEntities)
 
     // ── P&L per entity ──────────────────────────────────────────────────────
     const plMap = new Map<string, PLData>()
-    for (const tx of txData) {
-      if (!tx.entity) continue
-      const key = tx.entity_id
-      if (!plMap.has(key)) plMap.set(key, { entity: tx.entity!, income: 0, expense: 0, net: 0 })
+    for (const j of journals) {
+      if (!j.entity) continue
+      const key = j.entity_id
+      if (!plMap.has(key)) plMap.set(key, { entity: j.entity!, income: 0, expense: 0, net: 0 })
       const g = plMap.get(key)!
-      if (tx.type === 'INCOME') g.income += tx.amount
-      else                      g.expense += tx.amount
+      
+      j.lines?.forEach(l => {
+        const accClass = l.account?.account_class
+        if (accClass === 'REVENUE') g.income += (l.credit - l.debit)
+        if (accClass === 'EXPENSE' || accClass === 'COGS') g.expense += (l.debit - l.credit)
+      })
       g.net = g.income - g.expense
     }
     const pl = Array.from(plMap.values())
@@ -89,19 +94,33 @@ export function CEOCommandCenter() {
     setCashOnHand(holdingPL?.net ?? 0)
 
     // ── Burn Rate: avg monthly expense last 6 months ─────────────────────────
-    const totalExpense = txData.filter(t => t.type === 'EXPENSE').reduce((s, t) => s + t.amount, 0)
-    setBurnRate(totalExpense / 6)
+    let totalExp = 0
+    journals.forEach(j => {
+      j.lines?.forEach(l => {
+        if (l.account?.account_class === 'EXPENSE' || l.account?.account_class === 'COGS') {
+          totalExp += (l.debit - l.credit)
+        }
+      })
+    })
+    setBurnRate(totalExp / 6)
 
     // ── Monthly chart data ───────────────────────────────────────────────────
     const monthMap = new Map<string, MonthlyPoint>()
-    for (const tx of txData) {
-      if (!tx.entity || tx.entity.type === 'HOLDING') continue
-      const mo = tx.created_at.slice(0, 7) // YYYY-MM
+    for (const j of journals) {
+      if (!j.entity || j.entity.type === 'HOLDING') continue
+      const mo = j.transaction_date.slice(0, 7) // YYYY-MM
       if (!monthMap.has(mo)) monthMap.set(mo, { month: mo })
       const pt = monthMap.get(mo)!
-      const eName = tx.entity.name
+      const eName = j.entity.name
       const cur = (pt[eName] as number) ?? 0
-      pt[eName] = cur + (tx.type === 'INCOME' ? tx.amount : -tx.amount)
+      
+      let netJ = 0
+      j.lines?.forEach(l => {
+        const accClass = l.account?.account_class
+        if (accClass === 'REVENUE') netJ += (l.credit - l.debit)
+        if (accClass === 'EXPENSE' || accClass === 'COGS') netJ -= (l.debit - l.credit)
+      })
+      pt[eName] = cur + netJ
     }
     setChartData(Array.from(monthMap.values()).sort((a, b) => a.month.localeCompare(b.month)))
 

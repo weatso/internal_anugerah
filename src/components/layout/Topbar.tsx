@@ -2,19 +2,27 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ChevronRight, LogOut } from 'lucide-react'
+import { ChevronRight, LogOut, Menu } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUser } from '@/components/providers/UserProvider'
 
-export function Topbar() {
+interface TopbarProps {
+  onMenuClick: () => void
+}
+
+export function Topbar({ onMenuClick }: TopbarProps) {
   const pathname = usePathname()
   const segments = pathname.split('/').filter(Boolean)
   const { isImpersonating, impersonate, effectiveEntity } = useUser()
 
   return (
-    <header className="h-16 border-b border-white/5 bg-[#050505]/50 backdrop-blur-xl flex items-center justify-between px-8 sticky top-0 z-20">
+    <header className="h-16 border-b border-white/5 bg-[#050505]/50 backdrop-blur-xl flex items-center justify-between px-4 md:px-8 sticky top-0 z-20">
       {/* Breadcrumbs sebagai penanda navigasi tunggal */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-4">
+        <button onClick={onMenuClick} className="lg:hidden text-gray-400 hover:text-white">
+          <Menu className="w-5 h-5" />
+        </button>
+        <div className="flex items-center gap-2">
         <span className="text-[10px] uppercase tracking-[0.2em] text-gray-600 font-bold">Portal</span>
         {segments.map((segment, index) => {
           const href = '/' + segments.slice(0, index + 1).join('/')
@@ -31,6 +39,7 @@ export function Topbar() {
           )
         })}
       </div>
+    </div>
       
       {/* Elemen Kanan Minimalis */}
       <div className="flex items-center gap-6">

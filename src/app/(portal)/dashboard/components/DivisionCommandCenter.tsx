@@ -9,7 +9,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/components/providers/UserProvider'
 import { formatRupiah, formatDate } from '@/lib/utils'
 import { getEntityAccentColor, getDivisionConfig } from '@/lib/division-config'
-import type { Transaction } from '@/types'
+import type { JournalEntry } from '@/types'
 
 const FADE_UP = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0 } }
 
@@ -19,7 +19,7 @@ export function DivisionCommandCenter() {
 
   const [income, setIncome]   = useState(0)
   const [expense, setExpense] = useState(0)
-  const [recentTx, setRecentTx] = useState<Transaction[]>([])
+  const [recentJournals, setRecentJournals] = useState<JournalEntry[]>([])
   const [pendingInvoices, setPendingInvoices] = useState(0)
   const [workspaceLogs, setWorkspaceLogs] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -32,14 +32,15 @@ export function DivisionCommandCenter() {
   async function fetchData() {
     setLoading(true)
     const [
-      { data: txData },
+      { data: journalData },
       { count: invCount },
       { count: logCount },
     ] = await Promise.all([
       supabase
-        .from('transactions')
-        .select('*, entity:entities(*)')
-        .eq('entity_id', effectiveEntityId!),
+        .from('journal_entries')
+        .select('*, lines:journal_lines(*, account:chart_of_accounts(*))')
+        .eq('entity_id', effectiveEntityId!)
+        .eq('status', 'APPROVED'),
       supabase
         .from('invoices')
         .select('id', { count: 'exact', head: true })
@@ -51,12 +52,21 @@ export function DivisionCommandCenter() {
         .eq('entity_id', effectiveEntityId!),
     ])
 
-    const txs = (txData ?? []) as Transaction[]
-    const inc = txs.filter(t => t.type === 'INCOME').reduce((s, t) => s + t.amount, 0)
-    const exp = txs.filter(t => t.type === 'EXPENSE').reduce((s, t) => s + t.amount, 0)
+    const journals = (journalData ?? []) as JournalEntry[]
+    let inc = 0
+    let exp = 0
+    
+    journals.forEach(j => {
+      j.lines?.forEach(l => {
+        const accClass = l.account?.account_class
+        if (accClass === 'REVENUE') inc += (l.credit - l.debit)
+        if (accClass === 'EXPENSE' || accClass === 'COGS') exp += (l.debit - l.credit)
+      })
+    })
+
     setIncome(inc)
     setExpense(exp)
-    setRecentTx(txs.slice(-5).reverse())
+    setRecentJournals(journals.slice(-5).reverse())
     setPendingInvoices(invCount ?? 0)
     setWorkspaceLogs(logCount ?? 0)
     setLoading(false)
@@ -172,21 +182,28 @@ export function DivisionCommandCenter() {
               Lihat semua →
             </Link>
           </div>
-          {recentTx.length === 0 ? (
+          {recentJournals.length === 0 ? (
             <p className="text-[--color-text-muted] text-sm text-center py-8">Belum ada transaksi.</p>
           ) : (
             <div className="divide-y divide-[--color-border]">
-              {recentTx.map((tx) => (
-                <div key={tx.id} className="flex items-center justify-between px-5 py-3">
-                  <div>
-                    <p className="text-[--color-text-primary] text-sm font-medium">{tx.category}</p>
-                    <p className="text-[--color-text-muted] text-xs mt-0.5">{formatDate(tx.created_at)}</p>
+              {recentJournals.map((j) => {
+                // Heuristic for display
+                const isIncome = j.lines?.some(l => l.account?.account_class === 'REVENUE')
+                const category = j.lines?.find(l => !l.account?.is_bank)?.account?.account_name || 'N/A'
+                const amount = j.lines?.reduce((s, l) => s + (l.account?.is_bank ? Math.max(l.debit, l.credit) : 0), 0) || 0
+                
+                return (
+                  <div key={j.id} className="flex items-center justify-between px-5 py-3">
+                    <div>
+                      <p className="text-[--color-text-primary] text-sm font-medium">{category}</p>
+                      <p className="text-[--color-text-muted] text-xs mt-0.5">{formatDate(j.transaction_date)}</p>
+                    </div>
+                    <span className={`text-sm font-bold tabular-nums ${isIncome ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {isIncome ? '+' : '−'}{formatRupiah(amount)}
+                    </span>
                   </div>
-                  <span className={`text-sm font-bold tabular-nums ${tx.type === 'INCOME' ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {tx.type === 'INCOME' ? '+' : '−'}{formatRupiah(tx.amount)}
-                  </span>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>

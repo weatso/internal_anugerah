@@ -33,7 +33,6 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
           <Topbar
             onMenuClick={() => setSidebarOpen(!sidebarOpen)}
-            sidebarOpen={sidebarOpen}
           />
           <main className="flex-1 overflow-y-auto overflow-x-hidden">
             {children}

@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import { motion } from 'framer-motion'
 import {
   LayoutDashboard, TrendingUp, FileText, FolderKanban,
-  Settings, ArrowLeftRight, Briefcase, ShieldCheck
+  Settings, ArrowLeftRight, Briefcase, ShieldCheck, X
 } from 'lucide-react'
 import { useUser } from '@/components/providers/UserProvider'
 import { cn } from '@/lib/utils'
@@ -22,7 +22,11 @@ const NAV_ITEMS = [
   { href: '/settings', label: 'Settings', icon: Settings, roles: ['CEO','FINANCE','HEAD','STAFF','DESIGN'] },
 ]
 
-export function Sidebar() {
+interface SidebarProps {
+  onClose?: () => void
+}
+
+export function Sidebar({ onClose }: SidebarProps) {
   const [width, setWidth] = useState(260)
   const [isResizing, setIsResizing] = useState(false)
   const pathname = usePathname()
@@ -63,7 +67,7 @@ export function Sidebar() {
       />
 
       {/* Brand Header */}
-      <div className="p-6 border-b border-white/5">
+      <div className="p-6 border-b border-white/5 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="relative w-8 h-8 shrink-0">
             <Image src="/logo.png" alt="Anugerah" fill className="object-contain" />
@@ -73,6 +77,9 @@ export function Sidebar() {
             <p className="text-[#C5A028] text-[9px] tracking-[0.3em] font-bold uppercase">VENTURES OS</p>
           </div>
         </div>
+        <button onClick={onClose} className="lg:hidden text-gray-500 hover:text-white">
+          <X className="w-5 h-5" />
+        </button>
       </div>
 
       {/* Navigation */}
