@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { href: '/finance', label: 'Finance', icon: TrendingUp, roles: ['CEO','FINANCE','HEAD'] },
   { href: '/invoicing', label: 'Invoicing', icon: FileText, roles: ['CEO','FINANCE','HEAD'] },
   { href: '/workspace', label: 'Workspace', icon: FolderKanban, roles: ['CEO','FINANCE','HEAD','STAFF','DESIGN'] },
+  { href: '/clients', label: 'CRM / Clients', icon: Briefcase, roles: ['CEO','FINANCE','HEAD','STAFF'] },
   { href: '/sales-kit', label: 'Sales Kit', icon: Briefcase, roles: ['CEO','HEAD','DESIGN'] },
   { href: '/admin', label: 'Admin Panel', icon: ShieldCheck, roles: ['CEO'] },
   { href: '/settings', label: 'Settings', icon: Settings, roles: ['CEO','FINANCE','HEAD','STAFF','DESIGN'] },

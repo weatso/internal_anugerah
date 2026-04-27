@@ -1,35 +1,52 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { createServiceClient } from '@/lib/supabase/server'
-import { uploadToR2, buildStorageKey } from '@/lib/r2/client'
-import { getPresignedUrl } from '@/lib/r2/client'
-import { renderToBuffer } from '@react-pdf/renderer'
-import { InvoicePDFDocument } from '@/lib/pdf/InvoiceDocument'
-import type { Invoice, Entity } from '@/types'
+import { NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
+import { renderToStream } from '@react-pdf/renderer';
+import { CommercialDocumentPDF } from '@/lib/pdf/InvoiceDocument';
+import React from 'react';
 
-export async function POST(request: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const docId = searchParams.get('id');
 
-  const { invoice_id } = await request.json()
+    if (!docId) return new NextResponse('Document ID is required', { status: 400 });
 
-  const serviceClient = createServiceClient()
-  const { data: invoice, error } = await serviceClient
-    .from('invoices')
-    .select('*, entity:entities(*)')
-    .eq('id', invoice_id)
-    .single()
+    const supabase = await createClient();
 
-  if (error || !invoice) return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
-  if (invoice.status !== 'APPROVED') return NextResponse.json({ error: 'Invoice not approved' }, { status: 400 })
+    // Tarik Semua Data Bersarang (Nested)
+    const { data: document, error } = await supabase
+      .from('commercial_documents')
+      .select(`
+        *,
+        entities (name, type, primary_color, logo_key),
+        clients (*),
+        document_line_items (*)
+      `)
+      .eq('id', docId)
+      .single();
 
-  const buffer = await renderToBuffer(InvoicePDFDocument({ invoice: invoice as Invoice & { entity: Entity } }))
+    if (error || !document) return new NextResponse('Document not found', { status: 404 });
 
-  const key = buildStorageKey('invoices', invoice.entity_id, `${invoice.invoice_number ?? invoice.id}.pdf`)
-  await uploadToR2(key, buffer, 'application/pdf')
-  await serviceClient.from('invoices').update({ pdf_storage_key: key }).eq('id', invoice_id)
+    // FIX 1: Memaksa TypeScript menerima elemen React di dalam file .ts
+    const pdfComponent = React.createElement(CommercialDocumentPDF, { data: document }) as any;
+    const stream = await renderToStream(pdfComponent);
+    
+    // FIX 2: Menyeragamkan semua potongan aliran data menjadi Buffer murni
+    const chunks: Uint8Array[] = [];
+    for await (const chunk of stream as any) {
+      chunks.push(Buffer.from(chunk));
+    }
+    const pdfBuffer = Buffer.concat(chunks);
 
-  const url = await getPresignedUrl(key, 3600)
-  return NextResponse.json({ url, key })
+    return new NextResponse(pdfBuffer, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename="${document.doc_number.replace(/\//g, '_')}.pdf"`,
+      },
+    });
+  } catch (error: any) {
+    console.error("PDF Generation Error:", error);
+    return new NextResponse('Error generating PDF', { status: 500 });
+  }
 }

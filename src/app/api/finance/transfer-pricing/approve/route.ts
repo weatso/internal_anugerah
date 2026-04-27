@@ -7,88 +7,66 @@ export async function POST(request: Request) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: profile } = await supabase.from('profiles').select('*, entity:entities(*)').eq('id', user.id).single()
-    if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
-
-    const body = await request.json()
-    const { billing_id, expense_category_id } = body
-
-    if (!billing_id || !expense_category_id) {
-      return NextResponse.json({ error: 'Billing ID and Expense Category are required' }, { status: 400 })
-    }
-
-    // 1. Fetch Billing
-    const { data: billing, error: billingErr } = await supabase.from('internal_billings').select('*, from_entity:entities!internal_billings_from_entity_id_fkey(*), to_entity:entities!internal_billings_to_entity_id_fkey(*)').eq('id', billing_id).single()
-    if (billingErr || !billing) return NextResponse.json({ error: 'Billing not found' }, { status: 404 })
-    if (billing.status === 'APPROVED') return NextResponse.json({ error: 'Already approved' }, { status: 400 })
-
-    // Verify Authorization (Head of the target division, or CEO)
-    if (profile.role !== 'CEO' && (profile.role !== 'HEAD' || profile.entity_id !== billing.to_entity_id)) {
-      return NextResponse.json({ error: 'Not authorized to approve this billing' }, { status: 403 })
-    }
-
-    // 2. Find Affiliation Accounts
-    const { data: accounts } = await supabase.from('chart_of_accounts').select('*').in('account_code', ['2-9000', '1-9000'])
-    const liabilityAcc = accounts?.find(a => a.account_code === '2-9000') // Utang Afiliasi
-    const assetAcc = accounts?.find(a => a.account_code === '1-9000') // Piutang Afiliasi
+    const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
     
-    if (!liabilityAcc || !assetAcc) return NextResponse.json({ error: 'Akun afiliasi tidak lengkap' }, { status: 500 })
+    const body = await request.json()
+    // billing_id adalah ID dari internal_billings. expense_account_id dikirim dari frontend saat klik Approve.
+    const { billing_id, expense_account_id } = body
 
-    // Generate Reference
-    const dateStr = new Date().toISOString().split('T')[0]
-    const baseRef = `${dateStr.replace(/-/g, '').slice(0, 6)}-${Math.floor(1000 + Math.random() * 9000)}`
-
-    // ==========================================
-    // 3A. JURNAL UNTUK DIVISI YANG DITAGIH (EXPENSE)
-    // ==========================================
-    const { data: headerTo, error: errTo } = await supabase.from('journal_entries').insert({
-      transaction_date: dateStr,
-      reference_number: `TP-OUT-${baseRef}`,
-      description: `Tagihan Transfer Pricing dari ${billing.from_entity?.name}: ${billing.description}`,
-      entity_id: billing.to_entity_id,
-      status: 'APPROVED',
-      created_by: profile.id,
-      approved_by: profile.id
-    }).select().single()
-    if (errTo) throw errTo
-
-    const { error: linesToErr } = await supabase.from('journal_lines').insert([
-      { journal_id: headerTo.id, account_id: expense_category_id, debit: billing.amount, credit: 0 },
-      { journal_id: headerTo.id, account_id: liabilityAcc.id, debit: 0, credit: billing.amount }
-    ])
-    if (linesToErr) throw linesToErr
-
-    // ==========================================
-    // 3B. JURNAL UNTUK DIVISI YANG MENAGIH (REVENUE)
-    // ==========================================
-    if (billing.revenue_account_id) {
-      const { data: headerFrom, error: errFrom } = await supabase.from('journal_entries').insert({
-        transaction_date: dateStr,
-        reference_number: `TP-IN-${baseRef}`,
-        description: `Pendapatan Transfer Pricing ke ${billing.to_entity?.name}: ${billing.description}`,
-        entity_id: billing.from_entity_id,
-        status: 'APPROVED',
-        created_by: profile.id,
-        approved_by: profile.id
-      }).select().single()
-      if (errFrom) throw errFrom
-
-      const { error: linesFromErr } = await supabase.from('journal_lines').insert([
-        { journal_id: headerFrom.id, account_id: assetAcc.id, debit: billing.amount, credit: 0 }, // Piutang Bertambah
-        { journal_id: headerFrom.id, account_id: billing.revenue_account_id, debit: 0, credit: billing.amount } // Pendapatan Bertambah
-      ])
-      if (linesFromErr) throw linesFromErr
+    if (!billing_id || !expense_account_id) {
+      return NextResponse.json({ error: 'Data approval tidak lengkap' }, { status: 400 })
     }
 
-    // 5. Update Billing Status
-    const { error: updateErr } = await supabase.from('internal_billings').update({
+    // 1. TARIK DATA TAGIHAN
+    const { data: billing } = await supabase
+      .from('internal_billings')
+      .select('*')
+      .eq('id', billing_id)
+      .single()
+
+    if (!billing || billing.status !== 'PENDING_APPROVAL') {
+      return NextResponse.json({ error: 'Tagihan tidak valid atau sudah diproses' }, { status: 400 })
+    }
+
+    // 2. OTORISASI (Hanya CEO, FINANCE, atau HEAD divisi yang ditagih yang boleh Approve)
+    if (profile.role !== 'CEO' && profile.role !== 'FINANCE' && profile.entity_id !== billing.to_entity_id) {
+      return NextResponse.json({ error: 'Anda tidak memiliki otoritas menyetujui tagihan ini' }, { status: 403 })
+    }
+
+    // 3. UPDATE STATUS TAGIHAN
+    await supabase.from('internal_billings').update({
       status: 'APPROVED',
       approved_by: profile.id
     }).eq('id', billing_id)
 
-    if (updateErr) throw updateErr
+    // 4. INJEKSI KE BUKU BESAR (JOURNAL) SEBAGAI TRANSAKSI NON-TUNAI
+    const refNumber = `TP-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Math.floor(1000 + Math.random() * 9000)}`
 
-    return NextResponse.json({ success: true, data: headerTo })
+    // Buat Header Jurnal (dimasukkan ke entitas yang ditagih)
+    const { data: journal, error: journalError } = await supabase.from('journal_entries').insert({
+      entity_id: billing.to_entity_id,
+      transaction_date: new Date().toISOString(),
+      reference_number: refNumber,
+      description: `Internal Billing (TP) dari ${billing.from_entity_id}: ${billing.description}`,
+      status: 'APPROVED',
+      created_by: billing.created_by,
+      approved_by: profile.id
+    }).select().single()
+
+    if (journalError) throw journalError
+
+    // 5. DOUBLE-ENTRY TRANSFER PRICING
+    // Debit: Beban di divisi yang ditagih (to_entity)
+    // Credit: Pendapatan di divisi yang menagih (from_entity -> revenue_account_id)
+    const journalLines = [
+      { journal_id: journal.id, account_id: expense_account_id, debit: billing.amount, credit: 0 },
+      { journal_id: journal.id, account_id: billing.revenue_account_id, debit: 0, credit: billing.amount }
+    ]
+
+    await supabase.from('journal_lines').insert(journalLines)
+
+    return NextResponse.json({ success: true, message: 'Transfer Pricing disetujui dan dibukukan.' })
+
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }

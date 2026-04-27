@@ -11,7 +11,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/components/providers/UserProvider'
 import { formatRupiah, formatDate } from '@/lib/utils'
 import { getEntityAccentColor, getDivisionConfig } from '@/lib/division-config'
-import type { Entity, JournalEntry } from '@/types'
+import type { Entity } from '@/types'
 
 interface MonthlyPoint {
   month: string
@@ -45,83 +45,68 @@ export function CEOCommandCenter() {
 
   useEffect(() => { fetchAll() }, [])
 
+  // MESIN BARU: Cerdas, Ringan, dan Menggunakan SQL Views KAP v2
   async function fetchAll() {
     setLoading(true)
 
-    const sixMonthsAgo = new Date()
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
-
     const [
-      { data: journalAll },
       { data: entitiesData },
+      { data: bankBalances },
+      { data: monthlyPL },
       { count: invCount },
       { count: logCount },
     ] = await Promise.all([
-      supabase
-        .from('journal_entries')
-        .select('*, entity:entities(id,name,type,primary_color,logo_key), lines:journal_lines(*, account:chart_of_accounts(*))')
-        .eq('status', 'APPROVED')
-        .gte('transaction_date', sixMonthsAgo.toISOString().split('T')[0]),
       supabase.from('entities').select('*').order('type').order('name'),
+      supabase.from('global_bank_balances').select('*'), // Dihitung otomatis oleh Database
+      supabase.from('monthly_division_pl').select('*'), // Dihitung otomatis oleh Database
       supabase.from('invoices').select('id', { count: 'exact', head: true }).eq('status', 'PENDING_APPROVAL'),
       supabase.from('workspace_logs').select('id', { count: 'exact', head: true }).eq('status', 'SUBMITTED'),
     ])
 
-    const journals = (journalAll ?? []) as JournalEntry[]
     const divEntities = (entitiesData ?? []) as Entity[]
     setEntities(divEntities)
 
-    // ── P&L per entity ──────────────────────────────────────────────────────
+    // ── 1. Cash on Hand (Langsung dari Ledger Bank) ────────────────────────
+    const totalCash = (bankBalances || []).reduce((sum, b) => sum + Number(b.current_balance), 0)
+    setCashOnHand(totalCash)
+
+    // ── 2. P&L & Chart Data Aggregation (Tanpa Looping Ribuan Jurnal) ──────
     const plMap = new Map<string, PLData>()
-    for (const j of journals) {
-      if (!j.entity) continue
-      const key = j.entity_id
-      if (!plMap.has(key)) plMap.set(key, { entity: j.entity!, income: 0, expense: 0, net: 0 })
-      const g = plMap.get(key)!
-      
-      j.lines?.forEach(l => {
-        const accClass = l.account?.account_class
-        if (accClass === 'REVENUE') g.income += (l.credit - l.debit)
-        if (accClass === 'EXPENSE' || accClass === 'COGS') g.expense += (l.debit - l.credit)
-      })
-      g.net = g.income - g.expense
-    }
-    const pl = Array.from(plMap.values())
-    setPLData(pl)
-
-    // ── Cash on Hand (Holding entity) ────────────────────────────────────────
-    const holdingPL = pl.find(d => d.entity.type === 'HOLDING')
-    setCashOnHand(holdingPL?.net ?? 0)
-
-    // ── Burn Rate: avg monthly expense last 6 months ─────────────────────────
-    let totalExp = 0
-    journals.forEach(j => {
-      j.lines?.forEach(l => {
-        if (l.account?.account_class === 'EXPENSE' || l.account?.account_class === 'COGS') {
-          totalExp += (l.debit - l.credit)
-        }
-      })
-    })
-    setBurnRate(totalExp / 6)
-
-    // ── Monthly chart data ───────────────────────────────────────────────────
     const monthMap = new Map<string, MonthlyPoint>()
-    for (const j of journals) {
-      if (!j.entity || j.entity.type === 'HOLDING') continue
-      const mo = j.transaction_date.slice(0, 7) // YYYY-MM
-      if (!monthMap.has(mo)) monthMap.set(mo, { month: mo })
-      const pt = monthMap.get(mo)!
-      const eName = j.entity.name
-      const cur = (pt[eName] as number) ?? 0
-      
-      let netJ = 0
-      j.lines?.forEach(l => {
-        const accClass = l.account?.account_class
-        if (accClass === 'REVENUE') netJ += (l.credit - l.debit)
-        if (accClass === 'EXPENSE' || accClass === 'COGS') netJ -= (l.debit - l.credit)
+    let totalExp = 0
+    let uniqueMonths = new Set()
+
+    // Siapkan wadah per divisi
+    divEntities.forEach(e => {
+      plMap.set(e.id, { entity: e, income: 0, expense: 0, net: 0 })
+    })
+
+    if (monthlyPL) {
+      monthlyPL.forEach(row => {
+        const eId = row.entity_id
+        const eName = row.division_name
+        const month = row.month_period
+
+        uniqueMonths.add(month)
+        totalExp += Number(row.total_expense)
+
+        // Agregasi untuk Kartu Impersonate
+        if (plMap.has(eId)) {
+          const g = plMap.get(eId)!
+          g.income += Number(row.total_revenue)
+          g.expense += Number(row.total_expense)
+          g.net += Number(row.net_profit)
+        }
+
+        // Agregasi untuk Recharts
+        if (!monthMap.has(month)) monthMap.set(month, { month })
+        const pt = monthMap.get(month)!
+        pt[eName] = Number(row.net_profit)
       })
-      pt[eName] = cur + netJ
     }
+
+    setPLData(Array.from(plMap.values()))
+    setBurnRate(uniqueMonths.size > 0 ? totalExp / uniqueMonths.size : 0)
     setChartData(Array.from(monthMap.values()).sort((a, b) => a.month.localeCompare(b.month)))
 
     setPendingInvoices(invCount ?? 0)
@@ -149,12 +134,12 @@ export function CEOCommandCenter() {
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <motion.div variants={FADE_UP} className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <p className="text-amber-500 text-xs uppercase tracking-[0.35em] font-bold mb-1">Global Command Center</p>
+          <p className="text-[#D4AF37] text-xs uppercase tracking-[0.35em] font-bold mb-1">Global Command Center</p>
           <h1 className="text-[--color-text-primary] text-2xl md:text-3xl font-black tracking-tight">
             Halo, CEO <span className="text-[#D4AF37]">{firstName}</span>
           </h1>
           <p className="text-[--color-text-muted] text-sm mt-1">
-            Ekosistem Anugerah Ventures · Real-time overview
+            Ekosistem Vision Velocity Ventures · Real-time overview
           </p>
         </div>
 
@@ -176,14 +161,14 @@ export function CEOCommandCenter() {
         <BentoKPI
           label="Cash on Hand"
           value={formatRupiah(cashOnHand)}
-          sub="Net Holding"
+          sub="Total Liquid Asset"
           icon={<Wallet className="w-4 h-4" />}
           color={cashOnHand >= 0 ? '#10b981' : '#ef4444'}
         />
         <BentoKPI
           label="Burn Rate / Bulan"
           value={formatRupiah(burnRate)}
-          sub="Avg 6 bulan terakhir"
+          sub="Rata-rata pengeluaran"
           icon={<TrendingDown className="w-4 h-4" />}
           color="#f97316"
         />
@@ -208,9 +193,9 @@ export function CEOCommandCenter() {
 
       {/* ── Revenue vs Expense Chart ─────────────────────────────────────── */}
       {chartData.length > 0 && (
-        <motion.div variants={FADE_UP} className="glass-card p-5 md:p-6">
+        <motion.div variants={FADE_UP} className="glass-card p-5 md:p-6 border border-white/5">
           <h2 className="text-[--color-text-primary] font-bold mb-1">Net Cashflow per Divisi</h2>
-          <p className="text-[--color-text-muted] text-xs mb-6">6 bulan terakhir · positif = profit, negatif = rugi</p>
+          <p className="text-[--color-text-muted] text-xs mb-6">Grafik profitabilitas bulanan · positif = profit, negatif = rugi</p>
           <div className="h-[260px] md:h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData} margin={{ top: 5, right: 10, left: 5, bottom: 5 }}>
@@ -256,7 +241,7 @@ export function CEOCommandCenter() {
                 whileHover={{ scale: 1.02, y: -2 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => impersonate(entity.id)}
-                className="glass-card p-4 text-left group cursor-pointer transition-all hover:border-opacity-60"
+                className="glass-card p-4 text-left group cursor-pointer transition-all hover:border-opacity-60 bg-[#050505]/50"
                 style={{ borderColor: `${color}30` }}
               >
                 <div className="flex items-start justify-between mb-3">
@@ -269,7 +254,7 @@ export function CEOCommandCenter() {
                 {pl && (
                   <div className="space-y-1 border-t pt-2" style={{ borderColor: `${color}20` }}>
                     <div className="flex justify-between text-[10px]">
-                      <span className="text-[--color-text-muted]">Net</span>
+                      <span className="text-[--color-text-muted]">Net Profit</span>
                       <span className="font-bold" style={{ color: pl.net >= 0 ? '#10b981' : '#ef4444' }}>
                         {formatRupiah(pl.net)}
                       </span>
@@ -287,14 +272,13 @@ export function CEOCommandCenter() {
 }
 
 // ─── Bento KPI Card ──────────────────────────────────────────────────────────
-
 function BentoKPI({ label, value, sub, icon, color, href, pulse }: {
   label: string; value: string; sub: string
   icon: React.ReactNode; color: string; href?: string; pulse?: boolean
 }) {
   const Wrapper = href ? Link : 'div'
   return (
-    <Wrapper href={href ?? '#'} className={`glass-card p-4 md:p-5 flex flex-col gap-3 group transition-all hover:scale-[1.01] ${pulse ? 'animate-pulse hover:animate-none' : ''}`}
+    <Wrapper href={href ?? '#'} className={`glass-card p-4 md:p-5 flex flex-col gap-3 group transition-all hover:scale-[1.01] bg-[#050505]/50 ${pulse ? 'animate-pulse hover:animate-none' : ''}`}
       style={{ borderColor: `${color}25` }}>
       <div className="flex items-center justify-between">
         <p className="text-[--color-text-muted] text-xs uppercase tracking-wider">{label}</p>

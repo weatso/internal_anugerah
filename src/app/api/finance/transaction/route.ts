@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { ApprovalStatus } from '@/types'
 
 export async function POST(request: Request) {
   try {
@@ -8,107 +7,103 @@ export async function POST(request: Request) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: profile } = await supabase.from('profiles').select('*, entity:entities(*)').eq('id', user.id).single()
+    const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
     if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
 
     const body = await request.json()
-    const { type, amount, description, bank_account_id, category_id, proof_storage_key, transaction_date } = body
+    // Menangkap payload persis seperti yang dikirim oleh Frontend LAMA Anda
+    const { type, amount, bank_account_id, category_id, description, transaction_date, proof_storage_key } = body
 
-    if (!amount || amount <= 0) return NextResponse.json({ error: 'Amount must be greater than 0' }, { status: 400 })
-    if (!bank_account_id || !category_id) return NextResponse.json({ error: 'Bank and Category are required' }, { status: 400 })
-
-    const txDate = transaction_date || new Date().toISOString().split('T')[0]
-
-    // Generate Reference Number
-    const dateStr = txDate.replace(/-/g, '').slice(0, 6) // YYYYMM
-    const refPrefix = type === 'EXPENSE' ? `OUT-${dateStr}` : `IN-${dateStr}`
-    const refNumber = `${refPrefix}-${Math.floor(1000 + Math.random() * 9000)}`
-
-    let status: ApprovalStatus = 'PENDING_APPROVAL'
-    let approved_by = null
-
-    if (type === 'INCOME') {
-      if (profile.role === 'CEO' || profile.role === 'FINANCE') {
-        status = 'APPROVED'
-        approved_by = profile.id
-      } else {
-        status = 'PENDING_APPROVAL'
-      }
-    } else if (type === 'EXPENSE') {
-      if (profile.role === 'CEO') {
-        status = 'APPROVED'
-        approved_by = profile.id
-      } else if (profile.role === 'HEAD') {
-        // Check Limit
-        const { data: limitSettings } = await supabase.from('division_financial_settings').select('*').eq('entity_id', profile.entity_id).single()
-        
-        if (limitSettings) {
-          const now = new Date()
-          const lastReset = new Date(limitSettings.last_reset_month)
-          
-          let currentUsage = Number(limitSettings.current_month_usage)
-          
-          // Reset logic if month changed
-          if (now.getMonth() !== lastReset.getMonth() || now.getFullYear() !== lastReset.getFullYear()) {
-             currentUsage = 0
-          }
-
-          if (currentUsage + Number(amount) <= Number(limitSettings.monthly_auto_approve_limit)) {
-            status = 'APPROVED'
-            approved_by = profile.id
-            // Update usage
-            await supabase.from('division_financial_settings').update({
-              current_month_usage: currentUsage + Number(amount),
-              last_reset_month: now.toISOString().split('T')[0]
-            }).eq('entity_id', profile.entity_id)
-          } else {
-            status = 'PENDING_APPROVAL'
-          }
-        } else {
-          status = 'PENDING_APPROVAL'
-        }
-      } else {
-        status = 'PENDING_APPROVAL' // STAFF
-      }
+    if (!amount || amount <= 0 || !bank_account_id || !category_id) {
+      return NextResponse.json({ error: 'Data transaksi tidak lengkap' }, { status: 400 })
     }
 
-    // 1. Create Header
-    const { data: header, error: headerErr } = await supabase.from('journal_entries').insert({
-      transaction_date: txDate,
-      reference_number: refNumber,
-      description,
+    // 1. TENTUKAN STATUS & LIMIT 5 JUTA UNTUK HEAD (Hanya untuk Pengeluaran)
+    let finalStatus = 'PENDING_APPROVAL'
+    let approvedBy = null
+
+    if (profile.role === 'CEO' || profile.role === 'FINANCE') {
+      finalStatus = 'APPROVED'
+      approvedBy = profile.id
+    } else if (profile.role === 'HEAD' && type === 'EXPENSE') {
+      const { data: divSetting } = await supabase
+        .from('division_financial_settings')
+        .select('*')
+        .eq('entity_id', profile.entity_id)
+        .single()
+
+      if (divSetting) {
+        const now = new Date()
+        const lastReset = new Date(divSetting.last_reset_month)
+        let currentUsage = divSetting.current_month_usage
+
+        if (now.getMonth() !== lastReset.getMonth() || now.getFullYear() !== lastReset.getFullYear()) {
+          currentUsage = 0 // Reset bulan baru
+        }
+
+        if ((Number(currentUsage) + Number(amount)) <= Number(divSetting.monthly_auto_approve_limit)) {
+          finalStatus = 'APPROVED'
+          approvedBy = profile.id
+          
+          await supabase.from('division_financial_settings').update({
+            current_month_usage: Number(currentUsage) + Number(amount),
+            last_reset_month: now.toISOString()
+          }).eq('entity_id', profile.entity_id)
+        }
+      }
+    } else if (type === 'INCOME') {
+      // Pemasukan oleh HEAD otomatis PENDING sampai dikonfirmasi FINANCE bahwa uang benar masuk bank
+      finalStatus = 'PENDING_APPROVAL'
+    }
+
+    // 2. GENERATE NOMOR JURNAL
+    const refNumber = `JRN-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Math.floor(1000 + Math.random() * 9000)}`
+
+    // 3. INSERT HEADER JURNAL (Termasuk bukti struk dari Frontend)
+    const { data: journal, error: journalError } = await supabase.from('journal_entries').insert({
       entity_id: profile.entity_id,
-      proof_storage_key,
-      status,
+      transaction_date: transaction_date || new Date().toISOString(),
+      reference_number: refNumber,
+      description: description,
+      proof_storage_key: proof_storage_key, // Menangkap URL gambar
+      status: finalStatus,
       created_by: profile.id,
-      approved_by
+      approved_by: approvedBy
     }).select().single()
 
-    if (headerErr) throw headerErr
+    if (journalError) throw journalError
 
-    // 2. Create Lines
-    let debitAccount = ''
-    let creditAccount = ''
-
-    if (type === 'INCOME') {
-      debitAccount = bank_account_id // Asset increases (Debit)
-      creditAccount = category_id // Revenue increases (Credit)
-    } else if (type === 'EXPENSE') {
-      debitAccount = category_id // Expense increases (Debit)
-      creditAccount = bank_account_id // Asset decreases (Credit)
+    // 4. TRANSLASI KE DOUBLE-ENTRY KAP LOGIC
+    let journalLines = []
+    
+    if (type === 'EXPENSE') {
+      // Uang Keluar: Kategori/Biaya bertambah (Debit), Bank berkurang (Credit)
+      journalLines = [
+        { journal_id: journal.id, account_id: category_id, debit: amount, credit: 0 },
+        { journal_id: journal.id, account_id: bank_account_id, debit: 0, credit: amount }
+      ]
+    } else {
+      // Uang Masuk: Bank bertambah (Debit), Pendapatan bertambah (Credit)
+      journalLines = [
+        { journal_id: journal.id, account_id: bank_account_id, debit: amount, credit: 0 },
+        { journal_id: journal.id, account_id: category_id, debit: 0, credit: amount }
+      ]
     }
 
-    const { error: linesErr } = await supabase.from('journal_lines').insert([
-      { journal_id: header.id, account_id: debitAccount, debit: amount, credit: 0 },
-      { journal_id: header.id, account_id: creditAccount, debit: 0, credit: amount }
-    ])
-
-    if (linesErr) {
-       await supabase.from('journal_entries').delete().eq('id', header.id)
-       throw linesErr
+    // 5. VALIDASI KESEIMBANGAN MUTLAK
+    const totalDebit = journalLines.reduce((sum, line) => sum + line.debit, 0)
+    const totalCredit = journalLines.reduce((sum, line) => sum + line.credit, 0)
+    
+    if (totalDebit !== totalCredit) {
+      await supabase.from('journal_entries').delete().eq('id', journal.id)
+      throw new Error('FATAL: Jurnal tidak seimbang.')
     }
 
-    return NextResponse.json({ success: true, data: header })
+    const { error: lineError } = await supabase.from('journal_lines').insert(journalLines)
+    if (lineError) throw lineError
+
+    return NextResponse.json({ success: true, message: 'Transaksi berhasil dicatat', journal_id: journal.id })
+
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
