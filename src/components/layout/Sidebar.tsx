@@ -2,25 +2,26 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import {
   LayoutDashboard, TrendingUp, FileText, FolderKanban,
-  Settings, ArrowLeftRight, Briefcase, ShieldCheck, X
+  Settings, ArrowLeftRight, Briefcase, ShieldCheck, X, LogOut
 } from 'lucide-react'
 import { useUser } from '@/components/providers/UserProvider'
+import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
 
 const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['CEO','FINANCE','HEAD','STAFF','DESIGN'] },
-  { href: '/finance', label: 'Finance', icon: TrendingUp, roles: ['CEO','FINANCE','HEAD'] },
-  { href: '/invoicing', label: 'Invoicing', icon: FileText, roles: ['CEO','FINANCE','HEAD'] },
-  { href: '/workspace', label: 'Workspace', icon: FolderKanban, roles: ['CEO','FINANCE','HEAD','STAFF','DESIGN'] },
-  { href: '/clients', label: 'CRM / Clients', icon: Briefcase, roles: ['CEO','FINANCE','HEAD','STAFF'] },
-  { href: '/sales-kit', label: 'Sales Kit', icon: Briefcase, roles: ['CEO','HEAD','DESIGN'] },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['CEO', 'FINANCE', 'HEAD', 'STAFF', 'DESIGN'] },
+  { href: '/finance', label: 'Finance', icon: TrendingUp, roles: ['CEO', 'FINANCE', 'HEAD'] },
+  { href: '/invoicing', label: 'Invoicing', icon: FileText, roles: ['CEO', 'FINANCE', 'HEAD'] },
+  { href: '/workspace', label: 'Workspace', icon: FolderKanban, roles: ['CEO', 'FINANCE', 'HEAD', 'STAFF', 'DESIGN'] },
+  { href: '/clients', label: 'CRM / Clients', icon: Briefcase, roles: ['CEO', 'FINANCE', 'HEAD', 'STAFF'] },
+  { href: '/sales-kit', label: 'Sales Kit', icon: Briefcase, roles: ['CEO', 'HEAD', 'DESIGN'] },
   { href: '/admin', label: 'Admin Panel', icon: ShieldCheck, roles: ['CEO'] },
-  { href: '/settings', label: 'Settings', icon: Settings, roles: ['CEO','FINANCE','HEAD','STAFF','DESIGN'] },
+  { href: '/settings', label: 'Settings', icon: Settings, roles: ['CEO', 'FINANCE', 'HEAD', 'STAFF', 'DESIGN'] },
 ]
 
 interface SidebarProps {
@@ -31,20 +32,33 @@ export function Sidebar({ onClose }: SidebarProps) {
   const [width, setWidth] = useState(260)
   const [isResizing, setIsResizing] = useState(false)
   const pathname = usePathname()
-  const { profile, loading, effectiveEntity } = useUser()
+  const router = useRouter()
+  const supabase = createClient()
 
-  const role = profile?.role ?? 'STAFF'
-  const visibleNav = NAV_ITEMS.filter(item => item.roles.includes(role))
+  const { profile, highestRole, loading, effectiveEntity } = useUser()
+
+  const currentRole = highestRole ?? 'STAFF'
+  const visibleNav = NAV_ITEMS.filter(item => item.roles.includes(currentRole))
+
+  // Di dalam Sidebar.tsx
+  const handleSignOut = async () => {
+    try {
+      // Cukup panggil signOut. 
+      // UserProvider.tsx akan mendeteksi perubahan sesi dan melempar user ke /login secara otomatis.
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error("Gagal keluar:", error);
+    }
+  };
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing) return
-      // Kunci ukuran minimum 200px agar layout tidak hancur, maks 400px
       const newWidth = Math.min(400, Math.max(200, e.clientX))
       setWidth(newWidth)
     }
     const handleMouseUp = () => setIsResizing(false)
-    
+
     if (isResizing) {
       document.addEventListener('mousemove', handleMouseMove)
       document.addEventListener('mouseup', handleMouseUp)
@@ -61,7 +75,7 @@ export function Sidebar({ onClose }: SidebarProps) {
       transition={{ duration: isResizing ? 0 : 0.2, ease: "linear" }}
       className="relative flex flex-col h-screen bg-[#050505] border-r border-white/5 z-30 shrink-0"
     >
-      {/* Resizer Handle (Tuas Geser) */}
+      {/* Resizer Handle */}
       <div
         className="absolute right-0 top-0 w-1.5 h-full cursor-col-resize z-40 hover:bg-[#C5A028] transition-colors"
         onMouseDown={(e) => { e.preventDefault(); setIsResizing(true) }}
@@ -104,25 +118,40 @@ export function Sidebar({ onClose }: SidebarProps) {
         })}
       </nav>
 
-      {/* Prestige Identity Footer */}
+      {/* Profile & Logout Footer */}
       {!loading && profile && (
         <div className="mt-auto p-4 border-t border-white/5 bg-gradient-to-t from-white/[0.02] to-transparent">
-          <div className="flex items-center gap-3">
-            {(profile as any).avatar_url ? (
-              <div className="w-10 h-10 rounded-full shrink-0 relative overflow-hidden border border-[#C5A028]/30 bg-[#050505]">
-                <img src={(profile as any).avatar_url.startsWith('http') ? (profile as any).avatar_url : `/api/storage/file?key=${encodeURIComponent((profile as any).avatar_url)}`} alt="Profile" className="w-full h-full object-cover" />
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 overflow-hidden">
+              {(profile as any).avatar_url ? (
+                <div className="w-9 h-9 rounded-full shrink-0 relative overflow-hidden border border-[#C5A028]/30">
+                  <img
+                    src={(profile as any).avatar_url.startsWith('http') ? (profile as any).avatar_url : `/api/storage/file?key=${encodeURIComponent((profile as any).avatar_url)}`}
+                    alt="Profile"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="w-9 h-9 rounded-full bg-[#C5A028] flex items-center justify-center font-bold text-black shrink-0 text-xs">
+                  {profile.full_name?.charAt(0) || 'U'}
+                </div>
+              )}
+              <div className="overflow-hidden whitespace-nowrap">
+                <p className="text-white text-[11px] font-bold truncate leading-none mb-1">{profile.full_name}</p>
+                <p className="text-[9px] text-gray-500 uppercase tracking-widest font-medium truncate">
+                  {currentRole} • {effectiveEntity?.name || 'Holding'}
+                </p>
               </div>
-            ) : (
-              <div className="w-10 h-10 rounded-full bg-[#C5A028] flex items-center justify-center font-bold text-black shrink-0">
-                {profile.full_name?.charAt(0) || 'U'}
-              </div>
-            )}
-            <div className="overflow-hidden whitespace-nowrap">
-              <p className="text-white text-xs font-bold truncate leading-none mb-1">{profile.full_name}</p>
-              <p className="text-[9px] text-gray-500 uppercase tracking-widest font-medium truncate">
-                {profile.role} • {effectiveEntity?.name || 'Holding'}
-              </p>
             </div>
+
+            {/* TOMBOL LOGOUT */}
+            <button
+              onClick={handleSignOut}
+              className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded-sm transition-all"
+              title="Keluar"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
         </div>
       )}

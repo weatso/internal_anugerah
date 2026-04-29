@@ -2,60 +2,48 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
-import type { UserRole } from '@/types'
+import { useUser } from '@/components/providers/UserProvider'
 
 const ROLE_LABEL: Record<string, string> = {
   CEO: 'CEO',
   HEAD: 'Head',
   FINANCE: 'Finance',
+  DESIGN: 'Design',
   STAFF: 'Staff',
-  PENDING: 'Pending',
 }
 
 export default function WelcomePage() {
   const router = useRouter()
-  const supabase = createClient()
-  const [name, setName] = useState('')
-  const [role, setRole] = useState<string>('')
+  // Tarik data langsung dari Provider pusat
+  const { profile, highestRole, loading } = useUser()
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
-    let cancelled = false
+    // Jika masih loading, tahan eksekusi
+    if (loading) return;
 
-    async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.replace('/login'); return }
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('full_name, role')
-        .eq('id', user.id)
-        .single()
-
-      if (cancelled) return
-      if (!profile) {
-        // Jika database gagal/profil kosong, KELUARKAN ke login, jangan teruskan ke dashboard
-        router.replace('/login?error=profile_not_found');
-        return;
-      }
-      if (profile.role === 'PENDING') { router.replace('/pending'); return }
-
-      setName(profile.full_name.split(' ')[0])
-      setRole(ROLE_LABEL[profile.role] ?? profile.role)
-
-      // trigger animation
-      requestAnimationFrame(() => setVisible(true))
-
-      // redirect setelah 2.8s
-      setTimeout(() => {
-        if (!cancelled) router.replace('/dashboard')
-      }, 2800)
+    // Jika tidak ada profil, lemparkan keluar
+    if (!profile) {
+      router.replace('/login');
+      return;
     }
 
-    load()
-    return () => { cancelled = true }
-  }, [])
+    // Trigger animasi HTML
+    requestAnimationFrame(() => setVisible(true))
+
+    // Redirect otomatis ke dashboard setelah 2.8 detik
+    const timer = setTimeout(() => {
+      router.replace('/dashboard')
+    }, 2800)
+
+    return () => clearTimeout(timer)
+  }, [profile, loading, router])
+
+  // Cegah flicker kosong saat loading
+  if (loading || !profile) return null;
+
+  const firstName = profile.full_name.split(' ')[0]
+  const displayRole = highestRole ? (ROLE_LABEL[highestRole] ?? highestRole) : 'Staff'
 
   return (
     <div
@@ -97,9 +85,9 @@ export default function WelcomePage() {
           }}
         >
           Halo,{' '}
-          <span className="text-[#D4AF37]">{role}</span>
+          <span className="text-[#D4AF37]">{displayRole}</span>
           <br />
-          {name}
+          {firstName}
         </h1>
 
         <p

@@ -21,7 +21,7 @@ export interface Profile {
   entity_id: string
   full_name: string
   avatar_url?: string | null
-  role: UserRole
+  roles: UserRole[] // <-- INI YANG MENGHILANGKAN ERROR ANDA
   created_at: string
   entity?: Entity
 }
@@ -234,3 +234,20 @@ export interface SalesKitItem {
   entity?: Entity
   creator?: Profile
 }
+
+// ─── RBAC HIERARCHY LOGIC ──────────────────────────────────────────────────
+
+export const ROLE_HIERARCHY: Record<UserRole, number> = {
+  CEO: 1,
+  HEAD: 2,
+  FINANCE: 3,
+  DESIGN: 4,
+  STAFF: 5
+};
+
+export const getHighestRole = (roles: UserRole[] | undefined | null): UserRole | null => {
+  if (!roles || roles.length === 0) return null;
+  return roles.reduce((prev, curr) => 
+    ROLE_HIERARCHY[curr] < ROLE_HIERARCHY[prev] ? curr : prev
+  , roles[0]);
+};

@@ -3,48 +3,41 @@
 import { useUser } from '@/components/providers/UserProvider'
 import { CEOCommandCenter } from './components/CEOCommandCenter'
 import { DivisionCommandCenter } from './components/DivisionCommandCenter'
-import { StaffWorkspace } from './components/StaffWorkspace'
 import { DesignCommandCenter } from './components/DesignCommandCenter'
+import { StaffWorkspace } from './components/StaffWorkspace'
+import { Loader2 } from 'lucide-react'
 
 export default function DashboardPage() {
-  const { profile, loading, isImpersonating } = useUser()
+  // 1. Tarik profile dan highestRole dari otak sistem
+  const { profile, highestRole, loading } = useUser()
 
-  if (loading) {
+  if (loading || !profile) {
     return (
       <div className="flex h-screen items-center justify-center bg-[#050505]">
-        <span className="text-[#C5A028] font-mono text-[10px] tracking-[0.3em] uppercase animate-pulse">
-          Memuat Ruang Kontrol...
-        </span>
+        <Loader2 className="w-8 h-8 animate-spin text-[#D4AF37]" />
       </div>
     )
   }
 
-  if (!profile) return null
-
-  // 1. JALUR KHUSUS: Jika CEO sedang menyamar (Impersonate) menjadi divisi tertentu,
-  // paksa sistem menampilkan Dashboard Divisi, BUKAN Dashboard Global.
-  if (profile.role === 'CEO' && isImpersonating) {
-    return <DivisionCommandCenter />
-  }
-
-  // 2. JALUR ABSOLUT: Kunci akses berdasarkan jabatan yang terdaftar di database.
-  switch (profile.role) {
+  // 2. DISTRIBUSI KEKUASAAN (Render komponen berdasarkan Kasta Tertinggi)
+  // Jika dia punya ['CEO', 'STAFF'], highestRole adalah 'CEO', maka render CEOCommandCenter.
+  // Role 'STAFF' tetap ada di database untuk akses data log, tapi UI tetap UI CEO.
+  
+  switch (highestRole) {
     case 'CEO':
-    case 'FINANCE':
-      // Melihat ringkasan perputaran uang seluruh Holding Anugerah Ventures
       return <CEOCommandCenter />
       
     case 'HEAD':
-      // Hanya melihat performa divisi mereka sendiri (Weatso, Lokal, dll)
+    case 'FINANCE': 
+      // Asumsi Finance dan Head menggunakan dashboard tingkat divisi
       return <DivisionCommandCenter />
       
     case 'DESIGN':
-      // Hanya melihat antrean tugas desain dan manajemen aset (tanpa angka uang)
       return <DesignCommandCenter />
       
     case 'STAFF':
     default:
-      // Hanya melihat papan kerja operasional harian (tanpa metrik finansial)
+      // Kasta terbawah atau jabatan tidak dikenali
       return <StaffWorkspace />
   }
 }
