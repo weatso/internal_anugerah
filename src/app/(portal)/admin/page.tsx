@@ -44,7 +44,7 @@ export default function AdminPage() {
   const logoInputRef = useRef<HTMLInputElement>(null)
 
   // New user form
-  const [newUserForm, setNewUserForm] = useState({ email: '', password: '', full_name: '' })
+  const [newUserForm, setNewUserForm] = useState<{ email: string; password: string; full_name: string; entity_id: string; role: UserRole }>({ email: '', password: '', full_name: '', entity_id: '', role: 'STAFF' })
 
   // Role assignment form: array of {entity_id, role}
   const [roleAssignments, setRoleAssignments] = useState<{ entity_id: string; role: UserRole }[]>([])
@@ -63,18 +63,17 @@ export default function AdminPage() {
 
   async function fetchAll() {
     try {
-      const [
-        { data: ents },
-        { data: usrs },
-        { data: allUserRoles },
-      ] = await Promise.all([
-        supabase.from('entities').select('*').order('name'),
-        supabase.from('profiles').select('*, entity:entities(name)').order('created_at', { ascending: false }),
-        // user_roles mungkin belum ada jika SQL migration belum dijalankan — aman jika null
-        supabase.from('user_roles').select('*, entity:entities(*)'),
-      ])
-
+      // Ambil entitas
+      const { data: ents } = await supabase.from('entities').select('*').order('name')
       if (ents) setEntities(ents)
+
+      // Ambil profiles (hilangkan relasi entity:entities(name) untuk mencegah error jika FK tidak ada)
+      const { data: usrs, error: usrErr } = await supabase.from('profiles').select('*').order('created_at', { ascending: false })
+      if (usrErr) console.error('Error fetching profiles:', usrErr)
+
+      // Ambil user_roles
+      const { data: allUserRoles, error: urErr } = await supabase.from('user_roles').select('*, entity:entities(*)')
+      if (urErr) console.error('Error fetching user_roles:', urErr)
 
       if (usrs) {
         const enriched: AdminUser[] = usrs.map(u => ({
@@ -135,12 +134,15 @@ export default function AdminPage() {
       const res = await fetch('/api/admin/create-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...newUserForm, role: 'STAFF', entity_id: entities[0]?.id || '' }),
+        body: JSON.stringify({ 
+          ...newUserForm, 
+          entity_id: newUserForm.entity_id || entities[0]?.id || '' 
+        }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Gagal membuat akun')
       toast.success(`Akun ${newUserForm.full_name} berhasil dibuat.`)
-      setNewUserForm({ email: '', password: '', full_name: '' })
+      setNewUserForm({ email: '', password: '', full_name: '', entity_id: entities[0]?.id || '', role: 'STAFF' })
       await fetchAll()
     } catch (err: any) {
       toast.error(err.message)
@@ -293,6 +295,19 @@ export default function AdminPage() {
                     value={newUserForm.email} onChange={e => setNewUserForm(p => ({ ...p, email: e.target.value }))} />
                   <input className={inputCls} placeholder="Password Sementara (min 6)" required minLength={6}
                     value={newUserForm.password} onChange={e => setNewUserForm(p => ({ ...p, password: e.target.value }))} />
+                  <div className="grid grid-cols-2 gap-2">
+                    <select className="select-field text-sm" required
+                      value={newUserForm.entity_id || (entities.length > 0 ? entities[0].id : '')}
+                      onChange={e => setNewUserForm(p => ({ ...p, entity_id: e.target.value }))}>
+                      <option value="" disabled>Pilih Divisi</option>
+                      {entities.map(ent => <option key={ent.id} value={ent.id}>{ent.name}</option>)}
+                    </select>
+                    <select className="select-field text-sm" required
+                      value={newUserForm.role}
+                      onChange={e => setNewUserForm(p => ({ ...p, role: e.target.value as UserRole }))}>
+                      {ALL_ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                    </select>
+                  </div>
                   <button type="submit" disabled={loading}
                     className="w-full py-2.5 rounded-md text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2"
                     style={{ background: 'var(--gold)', color: '#050505' }}>
