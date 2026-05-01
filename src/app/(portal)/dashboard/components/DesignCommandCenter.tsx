@@ -117,7 +117,7 @@ export function DesignCommandCenter() {
                 <Link key={log.id} href={`/workspace/${log.id}`}
                   className="flex items-start justify-between px-5 py-3 hover:bg-white/[0.015] transition-colors group">
                   <div className="min-w-0 flex-1">
-                    <p className="text-[--color-text-primary] text-sm font-medium truncate group-hover:text-white transition-colors">{log.title}</p>
+                    <p className="text-[--color-text-primary] text-sm font-medium truncate group-hover:text-[--color-text-primary] transition-colors">{log.title}</p>
                     <p className="text-[--color-text-muted] text-xs mt-0.5">{formatDate(log.created_at)}</p>
                   </div>
                   <span className={`ml-4 shrink-0 text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${{
@@ -156,7 +156,7 @@ export function DesignCommandCenter() {
               {recentAssets.map((asset) => (
                 <div key={asset.id} className="flex items-center justify-between px-5 py-3 group">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded bg-white/5 flex items-center justify-center shrink-0 text-gray-400 group-hover:text-white transition-colors">
+                    <div className="w-8 h-8 rounded bg-white/5 flex items-center justify-center shrink-0 text-gray-400 group-hover:text-[--color-text-primary] transition-colors">
                       <ImageIcon className="w-4 h-4" />
                     </div>
                     <div className="min-w-0 flex-1">

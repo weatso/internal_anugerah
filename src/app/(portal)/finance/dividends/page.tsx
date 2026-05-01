@@ -184,11 +184,11 @@ export default function DividendsPage() {
         {/* Periode Filter */}
         <div className="flex items-center gap-3 bg-black/50 p-2 rounded-lg border border-white/10">
           <span className="text-xs text-gray-400 font-bold uppercase tracking-widest pl-2">Periode Profit:</span>
-          <select value={filterMonth} onChange={e => setFilterMonth(Number(e.target.value))} className="bg-transparent text-white text-sm font-bold focus:outline-none cursor-pointer">
-            {Array.from({ length: 12 }).map((_, i) => <option key={i} value={i + 1} className="bg-[#050505]">{new Date(0, i).toLocaleString('id-ID', { month: 'long' })}</option>)}
+          <select value={filterMonth} onChange={e => setFilterMonth(Number(e.target.value))} className="bg-transparent text-[--color-text-primary] text-sm font-bold focus:outline-none cursor-pointer">
+            {Array.from({ length: 12 }).map((_, i) => <option key={i} value={i + 1} className="bg-[--color-bg-primary]">{new Date(0, i).toLocaleString('id-ID', { month: 'long' })}</option>)}
           </select>
-          <select value={filterYear} onChange={e => setFilterYear(Number(e.target.value))} className="bg-transparent text-white text-sm font-bold focus:outline-none cursor-pointer pr-2">
-            {[2025, 2026, 2027].map(y => <option key={y} value={y} className="bg-[#050505]">{y}</option>)}
+          <select value={filterYear} onChange={e => setFilterYear(Number(e.target.value))} className="bg-transparent text-[--color-text-primary] text-sm font-bold focus:outline-none cursor-pointer pr-2">
+            {[2025, 2026, 2027].map(y => <option key={y} value={y} className="bg-[--color-bg-primary]">{y}</option>)}
           </select>
         </div>
       </div>
@@ -224,7 +224,7 @@ export default function DividendsPage() {
         {/* Action Card */}
         <div className="glass-card p-6 flex flex-col justify-center border-l-4 border-l-blue-500 border-y border-r border-white/5">
           <div className="mb-6">
-            <h3 className="text-white font-bold text-sm mb-2">Kebijakan Dividen Pemegang Saham</h3>
+            <h3 className="text-[--color-text-primary] font-bold text-sm mb-2">Kebijakan Dividen Pemegang Saham</h3>
             <p className="text-xs text-gray-400 mb-4 leading-relaxed">Dari Sisa Laba <strong className="text-blue-400">{formatRupiah(netProfitAfterSplit)}</strong>, berapa persentase yang ingin dicairkan sebagai Dividen Owner?</p>
             
             <div className="space-y-3">
@@ -236,17 +236,17 @@ export default function DividendsPage() {
                   disabled={hasDistributed}
                   className="flex-1 accent-blue-500"
                 />
-                <span className="text-white font-bold font-mono bg-white/10 px-2 py-1 rounded text-xs">{ownerPayoutRatio}%</span>
+                <span className="text-[--color-text-primary] font-bold font-mono bg-white/10 px-2 py-1 rounded text-xs">{ownerPayoutRatio}%</span>
               </div>
               
               <div className="bg-blue-500/10 p-3 rounded border border-blue-500/20">
                 <div className="flex justify-between text-xs mb-1">
                   <span className="text-blue-400">Dividen Cair:</span>
-                  <span className="text-white font-bold">{formatRupiah(totalOwnerDividend)}</span>
+                  <span className="text-[--color-text-primary] font-bold">{formatRupiah(totalOwnerDividend)}</span>
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-gray-400">Laba Ditahan:</span>
-                  <span className="text-white font-bold">{formatRupiah(retainedInCompany)}</span>
+                  <span className="text-[--color-text-primary] font-bold">{formatRupiah(retainedInCompany)}</span>
                 </div>
               </div>
             </div>
@@ -265,7 +265,7 @@ export default function DividendsPage() {
       {/* Stakeholders Allocation Table */}
       <div className="glass-card overflow-hidden border border-white/5">
         <div className="p-5 border-b border-white/5 flex items-center justify-between">
-          <h3 className="text-white font-bold">Rincian Alokasi Transfer</h3>
+          <h3 className="text-[--color-text-primary] font-bold">Rincian Alokasi Transfer</h3>
           <span className="text-xs bg-white/10 text-gray-300 px-3 py-1 rounded-full">{allAllocations.length} Rekening Tujuan</span>
         </div>
         
@@ -280,7 +280,7 @@ export default function DividendsPage() {
                     {a.name.charAt(0)}
                   </div>
                   <div>
-                    <h4 className="text-white font-bold">{a.name}</h4>
+                    <h4 className="text-[--color-text-primary] font-bold">{a.name}</h4>
                     <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">{a.type}</span>
                   </div>
                 </div>
@@ -292,7 +292,7 @@ export default function DividendsPage() {
                   </div>
                   <div>
                     <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-1">Nominal Cair</p>
-                    <p className="text-white font-black text-lg">{formatRupiah(a.distributed_amount)}</p>
+                    <p className="text-[--color-text-primary] font-black text-lg">{formatRupiah(a.distributed_amount)}</p>
                   </div>
                 </div>
               </div>
@@ -311,14 +311,14 @@ export default function DividendsPage() {
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="glass-card w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-white font-black text-lg">Konfirmasi Pembagian</h2>
-              <button onClick={() => setShowModal(false)} className="text-gray-500 hover:text-white"><X className="w-5 h-5" /></button>
+              <h2 className="text-[--color-text-primary] font-black text-lg">Konfirmasi Pembagian</h2>
+              <button onClick={() => setShowModal(false)} className="text-gray-500 hover:text-[--color-text-primary]"><X className="w-5 h-5" /></button>
             </div>
             
             <div className="space-y-6">
               <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-lg">
                 <p className="text-xs text-emerald-400 uppercase tracking-widest font-bold mb-1">Total Kas Yang Dikeluarkan</p>
-                <p className="text-2xl font-black text-white">{formatRupiah(totalDistributed)}</p>
+                <p className="text-2xl font-black text-[--color-text-primary]">{formatRupiah(totalDistributed)}</p>
                 <div className="flex gap-2 mt-2 text-[10px] text-gray-400 font-mono">
                   <span>INV: {formatRupiah(totalInvestorSplit)}</span> | 
                   <span>OWNER: {formatRupiah(totalOwnerDividend)}</span>
@@ -330,7 +330,7 @@ export default function DividendsPage() {
                 <select 
                   value={selectedBankId} 
                   onChange={e => setSelectedBankId(e.target.value)}
-                  className="w-full bg-black border border-white/20 rounded-md px-4 py-3 text-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] outline-none transition-all font-medium"
+                  className="w-full bg-black border border-white/20 rounded-md px-4 py-3 text-[--color-text-primary] focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] outline-none transition-all font-medium"
                 >
                   <option value="">-- Pilih Rekening Bank --</option>
                   {bankAccounts.map(b => (

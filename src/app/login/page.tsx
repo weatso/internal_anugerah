@@ -52,7 +52,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#050505] flex items-center justify-center px-4 relative overflow-hidden">
+    <main className="min-h-screen bg-[--color-bg-primary] flex items-center justify-center px-4 relative overflow-hidden">
       {/* Background grid */}
       <div className="absolute inset-0 bg-[linear-gradient(rgba(212,175,55,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(212,175,55,0.03)_1px,transparent_1px)] bg-[size:64px_64px]" />
       {/* Gold glow */}
@@ -64,16 +64,16 @@ export default function LoginPage() {
           <div className="relative w-16 h-16 mb-4">
             <Image src="/logo.png" alt="Anugerah Ventures" fill className="object-contain" priority />
           </div>
-          <h1 className="text-white font-black text-2xl tracking-tight">Anugerah OS</h1>
-          <p className="text-neutral-500 text-xs tracking-[0.3em] uppercase mt-1">
+          <h1 className="text-[--color-text-primary] font-black text-2xl tracking-tight">Anugerah OS</h1>
+          <p className="text-[--color-text-muted] text-xs tracking-[0.3em] uppercase mt-1">
             Vision. Velocity. Ventures.
           </p>
         </div>
 
         {/* Card */}
         <div className="glass-card p-8">
-          <h2 className="text-white font-bold text-lg mb-1">Masuk ke Sistem</h2>
-          <p className="text-neutral-500 text-sm mb-6">Akses terbatas untuk tim internal Anugerah Ventures.</p>
+          <h2 className="text-[--color-text-primary] font-bold text-lg mb-1">Masuk ke Sistem</h2>
+          <p className="text-[--color-text-muted] text-sm mb-6">Akses terbatas untuk tim internal Anugerah Ventures.</p>
 
           {/* Google Login — Primary */}
           <button
@@ -83,7 +83,7 @@ export default function LoginPage() {
             className="w-full flex items-center justify-center gap-3 bg-white text-[#111] font-bold py-3 rounded-md text-sm hover:bg-neutral-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-4"
           >
             {loadingGoogle ? (
-              <Loader2 className="w-4 h-4 animate-spin text-neutral-500" />
+              <Loader2 className="w-4 h-4 animate-spin text-[--color-text-muted]" />
             ) : (
               <svg width="18" height="18" viewBox="0 0 48 48" fill="none">
                 <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
@@ -101,7 +101,7 @@ export default function LoginPage() {
             <div className="flex-1 h-px bg-white/10" />
             <button
               onClick={() => setShowEmailForm(!showEmailForm)}
-              className="flex items-center gap-1 text-neutral-600 text-xs hover:text-neutral-400 transition-colors"
+              className="flex items-center gap-1 text-neutral-600 text-xs hover:text-[--color-text-muted] transition-colors"
             >
               atau email
               <ChevronDown className={`w-3 h-3 transition-transform ${showEmailForm ? 'rotate-180' : ''}`} />
@@ -113,7 +113,7 @@ export default function LoginPage() {
           {showEmailForm && (
             <form onSubmit={handleEmailLogin} className="flex flex-col gap-3">
               <div>
-                <label className="text-neutral-400 text-xs font-medium uppercase tracking-widest mb-1.5 block">Email</label>
+                <label className="text-[--color-text-muted] text-xs font-medium uppercase tracking-widest mb-1.5 block">Email</label>
                 <input
                   id="email"
                   type="email"
@@ -122,11 +122,11 @@ export default function LoginPage() {
                   required
                   autoComplete="email"
                   placeholder="nama@anugerah.id"
-                  className="w-full bg-white/[0.04] border border-white/10 rounded-md px-4 py-2.5 text-white text-sm placeholder:text-neutral-600 focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
+                  className="w-full bg-white/[0.04] border border-white/10 rounded-md px-4 py-2.5 text-[--color-text-primary] text-sm placeholder:text-neutral-600 focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
                 />
               </div>
               <div>
-                <label className="text-neutral-400 text-xs font-medium uppercase tracking-widest mb-1.5 block">Password</label>
+                <label className="text-[--color-text-muted] text-xs font-medium uppercase tracking-widest mb-1.5 block">Password</label>
                 <div className="relative">
                   <input
                     id="password"
@@ -136,10 +136,10 @@ export default function LoginPage() {
                     required
                     autoComplete="current-password"
                     placeholder="••••••••"
-                    className="w-full bg-white/[0.04] border border-white/10 rounded-md px-4 py-2.5 pr-11 text-white text-sm placeholder:text-neutral-600 focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
+                    className="w-full bg-white/[0.04] border border-white/10 rounded-md px-4 py-2.5 pr-11 text-[--color-text-primary] text-sm placeholder:text-neutral-600 focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
                   />
                   <button type="button" onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300 transition-colors">
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[--color-text-muted] hover:text-neutral-300 transition-colors">
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
@@ -148,7 +148,7 @@ export default function LoginPage() {
                 id="btn-login-email"
                 type="submit"
                 disabled={loadingEmail}
-                className="w-full bg-[#D4AF37] text-[#050505] font-bold py-2.5 rounded-md text-sm uppercase tracking-widest hover:bg-[#F5D678] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full bg-[#D4AF37] text-[--color-bg-primary] font-bold py-2.5 rounded-md text-sm uppercase tracking-widest hover:bg-[#F5D678] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {loadingEmail ? <><Loader2 className="w-4 h-4 animate-spin" /> Memproses...</> : 'Masuk'}
               </button>

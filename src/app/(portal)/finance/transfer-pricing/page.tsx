@@ -138,7 +138,7 @@ export default function TransferPricingPage() {
         </div>
         {isCeoOrFinance && (
           <button onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 bg-[#D4AF37] text-[#050505] font-bold px-4 py-2 rounded-md text-sm hover:bg-[#F5D678] transition-all uppercase tracking-widest shadow-lg shadow-[#D4AF37]/10">
+            className="flex items-center gap-2 bg-[#D4AF37] text-[--color-bg-primary] font-bold px-4 py-2 rounded-md text-sm hover:bg-[#F5D678] transition-all uppercase tracking-widest shadow-lg shadow-[#D4AF37]/10">
             <Plus className="w-4 h-4" /> Tagih Divisi
           </button>
         )}
@@ -156,13 +156,13 @@ export default function TransferPricingPage() {
               <div key={b.id} className="flex flex-col lg:flex-row lg:items-center justify-between px-5 py-5 gap-6">
                 <div className="flex items-start lg:items-center gap-4 min-w-0">
                   <div className="text-center text-xs text-[--color-text-muted] shrink-0 w-32 border border-white/5 bg-white/5 rounded p-2">
-                    <p className="font-bold text-white">{b.from_entity_data?.name ?? 'Holding'}</p>
+                    <p className="font-bold text-[--color-text-primary]">{b.from_entity_data?.name ?? 'Holding'}</p>
                     <ArrowRight className="w-4 h-4 mx-auto my-1.5 text-[#D4AF37]" />
                     <p className="font-bold text-[#D4AF37]">{b.to_entity_data?.name ?? 'Divisi'}</p>
                   </div>
                   <div>
                     <p className="text-emerald-400 font-black text-lg">{formatRupiah(b.amount)}</p>
-                    <p className="text-white text-sm mt-1 font-medium">{b.description}</p>
+                    <p className="text-[--color-text-primary] text-sm mt-1 font-medium">{b.description}</p>
                     <p className="text-[--color-text-muted] text-xs mt-1">{formatDate(b.created_at)}</p>
                   </div>
                 </div>
@@ -175,7 +175,7 @@ export default function TransferPricingPage() {
                   {b.status === 'PENDING_APPROVAL' && (profile?.role === 'CEO' || (profile?.role === 'HEAD' && profile?.entity_id === b.to_entity_id)) && (
                     <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2 mt-2">
                       <select value={selectedExpenseCategory} onChange={e => setSelectedExpenseCategory(e.target.value)}
-                        className="bg-black/50 border border-white/10 rounded-md px-3 py-2 text-white text-xs focus:border-[#D4AF37]/50 w-full lg:w-48">
+                        className="bg-black/50 border border-white/10 rounded-md px-3 py-2 text-[--color-text-primary] text-xs focus:border-[#D4AF37]/50 w-full lg:w-48">
                         <option value="">Pilih Akun Beban...</option>
                         {expenseAccounts.map(acc => <option key={acc.id} value={acc.id}>{acc.account_code} - {acc.account_name}</option>)}
                       </select>
@@ -214,7 +214,7 @@ export default function TransferPricingPage() {
                 <div>
                   <label className="text-[--color-text-muted] text-xs uppercase tracking-widest mb-1.5 block">Divisi Penagih (Yang Mengirim Bill)</label>
                   <select required value={formFromEntity} onChange={e => setFormFromEntity(e.target.value)} disabled={profile?.role === 'HEAD'}
-                    className="w-full bg-black/50 border border-white/10 rounded-md px-3 py-2 text-white text-sm focus:border-[#D4AF37]/50 disabled:opacity-50">
+                    className="w-full bg-black/50 border border-white/10 rounded-md px-3 py-2 text-[--color-text-primary] text-sm focus:border-[#D4AF37]/50 disabled:opacity-50">
                     <option value="">-- Pilih Penagih --</option>
                     {entities.map(en => <option key={en.id} value={en.id}>{en.name}</option>)}
                   </select>
@@ -222,7 +222,7 @@ export default function TransferPricingPage() {
                 <div>
                   <label className="text-[--color-text-muted] text-xs uppercase tracking-widest mb-1.5 block">Akun Pendapatan Penagih (Opsional)</label>
                   <select value={formRevenueAcc} onChange={e => setFormRevenueAcc(e.target.value)}
-                    className="w-full bg-black/50 border border-white/10 rounded-md px-3 py-2 text-white text-sm focus:border-[#D4AF37]/50">
+                    className="w-full bg-black/50 border border-white/10 rounded-md px-3 py-2 text-[--color-text-primary] text-sm focus:border-[#D4AF37]/50">
                     <option value="">-- Abaikan jika tidak diakui sbg pendapatan --</option>
                     {revenueAccounts.map(acc => <option key={acc.id} value={acc.id}>{acc.account_code} - {acc.account_name}</option>)}
                   </select>
@@ -231,23 +231,23 @@ export default function TransferPricingPage() {
 
               <div>
                 <div className="flex items-center justify-between mb-3 border-b border-white/10 pb-2">
-                  <label className="text-white text-sm font-bold">Daftar Divisi yang Ditagih</label>
+                  <label className="text-[--color-text-primary] text-sm font-bold">Daftar Divisi yang Ditagih</label>
                   <button type="button" onClick={addAllocation} className="text-[#D4AF37] text-xs font-bold uppercase tracking-widest hover:text-[#F5D678] bg-[#D4AF37]/10 px-3 py-1.5 rounded">+ Tambah Baris</button>
                 </div>
                 
                 {allocations.map((alloc, i) => (
                   <div key={i} className="flex flex-col md:flex-row gap-3 mb-4 bg-white/5 p-3 rounded border border-white/5 relative">
-                    <button type="button" onClick={() => setAllocations(a => a.filter((_, j) => j !== i))} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-400"><X className="w-3 h-3" /></button>
+                    <button type="button" onClick={() => setAllocations(a => a.filter((_, j) => j !== i))} className="absolute -top-2 -right-2 bg-red-500 text-[--color-text-primary] rounded-full p-1 hover:bg-red-400"><X className="w-3 h-3" /></button>
                     
                     <div className="flex-1 space-y-2">
                       <select value={alloc.entity_id} onChange={e => setAllocations(a => a.map((x, j) => j === i ? { ...x, entity_id: e.target.value } : x))}
-                        className="w-full bg-black/50 border border-white/10 rounded-md px-3 py-2 text-white text-sm focus:outline-none focus:border-[#D4AF37]/50">
+                        className="w-full bg-black/50 border border-white/10 rounded-md px-3 py-2 text-[--color-text-primary] text-sm focus:outline-none focus:border-[#D4AF37]/50">
                         <option value="">-- Pilih Divisi --</option>
                         {entities.filter(e => e.id !== formFromEntity).map(en => <option key={en.id} value={en.id}>{en.name}</option>)}
                       </select>
                       <input type="text" placeholder="Deskripsi (misal: Tagihan VPS Bulanan)" value={alloc.description}
                         onChange={e => setAllocations(a => a.map((x, j) => j === i ? { ...x, description: e.target.value } : x))}
-                        className="w-full bg-black/50 border border-white/10 rounded-md px-3 py-2 text-white text-sm focus:outline-none focus:border-[#D4AF37]/50"
+                        className="w-full bg-black/50 border border-white/10 rounded-md px-3 py-2 text-[--color-text-primary] text-sm focus:outline-none focus:border-[#D4AF37]/50"
                       />
                     </div>
                     <div className="md:w-1/3">
@@ -256,7 +256,7 @@ export default function TransferPricingPage() {
                           const val = e.target.value.replace(/\D/g, '')
                           setAllocations(a => a.map((x, j) => j === i ? { ...x, amount: val ? parseInt(val).toLocaleString('id-ID') : '' } : x))
                         }}
-                        className="w-full bg-black/50 border border-white/10 rounded-md px-3 py-2 text-white text-sm focus:outline-none focus:border-[#D4AF37]/50 h-full"
+                        className="w-full bg-black/50 border border-white/10 rounded-md px-3 py-2 text-[--color-text-primary] text-sm focus:outline-none focus:border-[#D4AF37]/50 h-full"
                       />
                     </div>
                   </div>
@@ -265,7 +265,7 @@ export default function TransferPricingPage() {
               </div>
               
               <button type="submit" disabled={submitting || allocations.length === 0}
-                className="w-full bg-[#D4AF37] text-[#050505] font-bold py-3.5 rounded-md text-sm hover:bg-[#F5D678] transition-colors disabled:opacity-50 flex items-center justify-center gap-2 uppercase tracking-widest mt-4">
+                className="w-full bg-[#D4AF37] text-[--color-bg-primary] font-bold py-3.5 rounded-md text-sm hover:bg-[#F5D678] transition-colors disabled:opacity-50 flex items-center justify-center gap-2 uppercase tracking-widest mt-4">
                 {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Menyimpan...</> : 'Kirim Tagihan ke Divisi'}
               </button>
             </form>

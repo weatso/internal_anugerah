@@ -117,7 +117,7 @@ export default function DocumentBuilderPage() {
     }
   }
 
-  if (loading) return <div className="p-8 text-white font-mono text-xs uppercase tracking-widest">Memuat Generator Dokumen...</div>
+  if (loading) return <div className="p-8 text-[--color-text-primary] font-mono text-xs uppercase tracking-widest">Memuat Generator Dokumen...</div>
 
   return (
     <div className="p-6 md:p-8 max-w-5xl mx-auto space-y-8 animate-[slide-up_0.4s_ease]">
@@ -127,8 +127,8 @@ export default function DocumentBuilderPage() {
         <div className="flex items-center gap-2 text-gray-500 text-[10px] uppercase tracking-widest font-bold mb-2">
           <span>Commercial Hub</span> <ChevronRight size={12}/> <span className="text-[#C5A028]">Document Builder</span>
         </div>
-        <h1 className="text-white text-2xl font-black tracking-tighter">Pembuatan Dokumen Komersial</h1>
-        <p className="text-gray-500 text-sm mt-1">Divisi: <span className="text-white font-bold">{effectiveEntity?.name || 'Holding'}</span></p>
+        <h1 className="text-[--color-text-primary] text-2xl font-black tracking-tighter">Pembuatan Dokumen Komersial</h1>
+        <p className="text-gray-500 text-sm mt-1">Divisi: <span className="text-[--color-text-primary] font-bold">{effectiveEntity?.name || 'Holding'}</span></p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -136,7 +136,7 @@ export default function DocumentBuilderPage() {
         {/* KOLOM KIRI: SETUP METADATA & KLIEN */}
         <div className="lg:col-span-1 space-y-6">
           <div className="glass-card p-6 border-t-2 border-t-[#C5A028]">
-            <h2 className="text-xs font-bold text-white uppercase tracking-widest flex items-center gap-2 mb-4 border-b border-white/5 pb-2">
+            <h2 className="text-xs font-bold text-[--color-text-primary] uppercase tracking-widest flex items-center gap-2 mb-4 border-b border-white/5 pb-2">
               <Building2 size={14} className="text-[#C5A028]"/> Relasi Klien
             </h2>
             <div className="space-y-4">
@@ -166,7 +166,7 @@ export default function DocumentBuilderPage() {
           </div>
 
           <div className="glass-card p-6">
-            <h2 className="text-xs font-bold text-white uppercase tracking-widest flex items-center gap-2 mb-4 border-b border-white/5 pb-2">
+            <h2 className="text-xs font-bold text-[--color-text-primary] uppercase tracking-widest flex items-center gap-2 mb-4 border-b border-white/5 pb-2">
               <Calendar size={14} className="text-[#C5A028]"/> Terminologi Waktu
             </h2>
             <div className="space-y-4">
@@ -188,10 +188,10 @@ export default function DocumentBuilderPage() {
           {/* MESIN KONTEN (JSONB) */}
           <div className="glass-card p-6">
             <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-2">
-              <h2 className="text-xs font-bold text-white uppercase tracking-widest flex items-center gap-2">
+              <h2 className="text-xs font-bold text-[--color-text-primary] uppercase tracking-widest flex items-center gap-2">
                 <FileSignature size={14} className="text-[#C5A028]"/> Teks Paragraf Dokumen
               </h2>
-              <button onClick={() => setBlocks([...blocks, { id: Date.now(), content: '' }])} className="text-[10px] text-[#C5A028] font-bold uppercase tracking-widest flex items-center gap-1 hover:text-white transition-colors">
+              <button onClick={() => setBlocks([...blocks, { id: Date.now(), content: '' }])} className="text-[10px] text-[#C5A028] font-bold uppercase tracking-widest flex items-center gap-1 hover:text-[--color-text-primary] transition-colors">
                 <Plus size={12}/> Tambah Blok Teks
               </button>
             </div>
@@ -202,7 +202,7 @@ export default function DocumentBuilderPage() {
                   <div className="absolute -left-3 top-2 bottom-2 w-1 bg-[#C5A028]/20 rounded-full group-hover:bg-[#C5A028] transition-colors" />
                   <textarea 
                     rows={3} 
-                    className="w-full bg-[#0A0A0A] border border-white/5 rounded-sm p-3 text-sm text-gray-300 focus:border-[#C5A028] focus:outline-none resize-y leading-relaxed"
+                    className="w-full bg-[--color-bg-elevated] border border-white/5 rounded-sm p-3 text-sm text-gray-300 focus:border-[#C5A028] focus:outline-none resize-y leading-relaxed"
                     placeholder="Ketik isi paragraf, syarat & ketentuan, atau salam pembuka di sini..."
                     value={block.content}
                     onChange={e => setBlocks(blocks.map(b => b.id === block.id ? { ...b, content: e.target.value } : b))}
@@ -221,31 +221,31 @@ export default function DocumentBuilderPage() {
           {/* MESIN FINANSIAL (TABEL HARGA) */}
           <div className="glass-card p-6">
             <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-2">
-              <h2 className="text-xs font-bold text-white uppercase tracking-widest flex items-center gap-2">
+              <h2 className="text-xs font-bold text-[--color-text-primary] uppercase tracking-widest flex items-center gap-2">
                 <FileText size={14} className="text-[#C5A028]"/> Rincian Kalkulasi (Line Items)
               </h2>
-              <button onClick={() => setLineItems([...lineItems, { id: Date.now(), description: '', qty: 1, unit_price: 0, total_price: 0 }])} className="text-[10px] text-[#C5A028] font-bold uppercase tracking-widest flex items-center gap-1 hover:text-white transition-colors">
+              <button onClick={() => setLineItems([...lineItems, { id: Date.now(), description: '', qty: 1, unit_price: 0, total_price: 0 }])} className="text-[10px] text-[#C5A028] font-bold uppercase tracking-widest flex items-center gap-1 hover:text-[--color-text-primary] transition-colors">
                 <Plus size={12}/> Tambah Item
               </button>
             </div>
 
             <div className="space-y-3">
               {lineItems.map((item, index) => (
-                <div key={item.id} className="flex items-start gap-3 bg-[#0A0A0A] p-3 border border-white/5 rounded-sm">
+                <div key={item.id} className="flex items-start gap-3 bg-[--color-bg-elevated] p-3 border border-white/5 rounded-sm">
                   <div className="flex-1">
-                    <input type="text" className="w-full bg-transparent border-b border-white/10 p-1 text-sm text-white focus:border-[#C5A028] focus:outline-none mb-2" placeholder="Deskripsi Jasa / Barang..." value={item.description} onChange={e => updateLineItem(item.id, 'description', e.target.value)} />
+                    <input type="text" className="w-full bg-transparent border-b border-white/10 p-1 text-sm text-[--color-text-primary] focus:border-[#C5A028] focus:outline-none mb-2" placeholder="Deskripsi Jasa / Barang..." value={item.description} onChange={e => updateLineItem(item.id, 'description', e.target.value)} />
                     <div className="flex gap-4">
                       <div className="w-20">
                         <label className="text-[9px] text-gray-500 uppercase tracking-widest">Qty</label>
-                        <input type="number" className="w-full bg-transparent text-sm text-white font-mono" value={item.qty} onChange={e => updateLineItem(item.id, 'qty', Number(e.target.value))} />
+                        <input type="number" className="w-full bg-transparent text-sm text-[--color-text-primary] font-mono" value={item.qty} onChange={e => updateLineItem(item.id, 'qty', Number(e.target.value))} />
                       </div>
                       <div className="flex-1">
                         <label className="text-[9px] text-gray-500 uppercase tracking-widest">Harga Satuan (Rp)</label>
-                        <input type="number" className="w-full bg-transparent text-sm text-white font-mono" value={item.unit_price} onChange={e => updateLineItem(item.id, 'unit_price', Number(e.target.value))} />
+                        <input type="number" className="w-full bg-transparent text-sm text-[--color-text-primary] font-mono" value={item.unit_price} onChange={e => updateLineItem(item.id, 'unit_price', Number(e.target.value))} />
                       </div>
                       <div className="flex-1 text-right">
                         <label className="text-[9px] text-gray-500 uppercase tracking-widest">Total Baris</label>
-                        <p className="text-sm font-bold text-white font-mono mt-1">{formatRupiah(item.total_price)}</p>
+                        <p className="text-sm font-bold text-[--color-text-primary] font-mono mt-1">{formatRupiah(item.total_price)}</p>
                       </div>
                     </div>
                   </div>

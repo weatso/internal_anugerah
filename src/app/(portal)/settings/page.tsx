@@ -133,7 +133,7 @@ export default function SettingsPage() {
         {/* SIDEBAR NAVIGATION */}
         <aside className="w-full md:w-64 space-y-2">
           <div className="px-3 mb-6">
-            <h1 className="text-2xl font-bold text-white tracking-tight">Pengaturan</h1>
+            <h1 className="text-2xl font-bold text-[--color-text-primary] tracking-tight">Pengaturan</h1>
             <p className="text-xs text-[--color-text-muted] uppercase tracking-widest mt-1">Konfigurasi Personal</p>
           </div>
           <nav className="space-y-1">
@@ -144,11 +144,11 @@ export default function SettingsPage() {
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-lg transition-all duration-200 group ${
                   activeTab === item.id 
                     ? 'bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20' 
-                    : 'text-[--color-text-secondary] hover:bg-white/5 hover:text-white'
+                    : 'text-[--color-text-secondary] hover:bg-white/5 hover:text-[--color-text-primary]'
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <item.icon className={`w-4 h-4 ${activeTab === item.id ? 'text-[#D4AF37]' : 'text-[--color-text-muted] group-hover:text-white'}`} />
+                  <item.icon className={`w-4 h-4 ${activeTab === item.id ? 'text-[#D4AF37]' : 'text-[--color-text-muted] group-hover:text-[--color-text-primary]'}`} />
                   <span className="text-sm font-medium">{item.label}</span>
                 </div>
                 {activeTab === item.id && <ChevronRight className="w-4 h-4" />}
@@ -174,7 +174,7 @@ export default function SettingsPage() {
                       <User className="w-5 h-5" />
                     </div>
                     <div>
-                      <h2 className="text-lg font-bold text-white">Profil Pengguna</h2>
+                      <h2 className="text-lg font-bold text-[--color-text-primary]">Profil Pengguna</h2>
                       <p className="text-xs text-[--color-text-muted]">Ubah nama dan foto profil Anda</p>
                     </div>
                   </div>
@@ -213,7 +213,7 @@ export default function SettingsPage() {
                               <UploadCloud className="w-5 h-5 text-[--color-text-muted]" />
                             </div>
                           )}
-                          <p className="text-sm font-bold text-white mb-1">
+                          <p className="text-sm font-bold text-[--color-text-primary] mb-1">
                             {uploadingAvatar ? 'Mengunggah...' : 'Klik atau Drag file foto'}
                           </p>
                           <p className="text-xs text-[--color-text-muted]">Maks 2MB (JPG/PNG)</p>
@@ -227,7 +227,7 @@ export default function SettingsPage() {
                           <input 
                             type="text" 
                             required 
-                            className="w-full bg-[--color-bg-elevated] border border-[--color-border] rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:border-[#D4AF37]/50 focus:ring-1 focus:ring-[#D4AF37]/20 focus:outline-none transition-all"
+                            className="w-full bg-[--color-bg-elevated] border border-[--color-border] rounded-lg pl-10 pr-4 py-2.5 text-sm text-[--color-text-primary] focus:border-[#D4AF37]/50 focus:ring-1 focus:ring-[#D4AF37]/20 focus:outline-none transition-all"
                             value={profileForm.full_name}
                             onChange={e => setProfileForm({...profileForm, full_name: e.target.value})}
                             placeholder="Nama Anda"
@@ -264,7 +264,7 @@ export default function SettingsPage() {
                       <ShieldCheck className="w-5 h-5" />
                     </div>
                     <div>
-                      <h2 className="text-lg font-bold text-white">Keamanan Akun</h2>
+                      <h2 className="text-lg font-bold text-[--color-text-primary]">Keamanan Akun</h2>
                       <p className="text-xs text-[--color-text-muted]">Kelola kredensial akses Anda</p>
                     </div>
                   </div>
@@ -281,7 +281,7 @@ export default function SettingsPage() {
                             type="password" 
                             required 
                             minLength={6}
-                            className="w-full bg-[--color-bg-elevated] border border-[--color-border] rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:border-[#D4AF37]/50 focus:ring-1 focus:ring-[#D4AF37]/20 focus:outline-none transition-all"
+                            className="w-full bg-[--color-bg-elevated] border border-[--color-border] rounded-lg pl-10 pr-4 py-2.5 text-sm text-[--color-text-primary] focus:border-[#D4AF37]/50 focus:ring-1 focus:ring-[#D4AF37]/20 focus:outline-none transition-all"
                             value={passwordForm.newPassword}
                             onChange={e => setPasswordForm({...passwordForm, newPassword: e.target.value})}
                             placeholder="••••••••"
@@ -297,7 +297,7 @@ export default function SettingsPage() {
                             type="password" 
                             required 
                             minLength={6}
-                            className="w-full bg-[--color-bg-elevated] border border-[--color-border] rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:border-[#D4AF37]/50 focus:ring-1 focus:ring-[#D4AF37]/20 focus:outline-none transition-all"
+                            className="w-full bg-[--color-bg-elevated] border border-[--color-border] rounded-lg pl-10 pr-4 py-2.5 text-sm text-[--color-text-primary] focus:border-[#D4AF37]/50 focus:ring-1 focus:ring-[#D4AF37]/20 focus:outline-none transition-all"
                             value={passwordForm.confirmPassword}
                             onChange={e => setPasswordForm({...passwordForm, confirmPassword: e.target.value})}
                             placeholder="••••••••"
@@ -309,7 +309,7 @@ export default function SettingsPage() {
                     <button 
                       type="submit" 
                       disabled={loading} 
-                      className="inline-flex items-center justify-center gap-2 bg-white/10 hover:bg-white/15 text-white text-[11px] font-bold px-6 py-3 rounded-lg transition-all uppercase tracking-widest disabled:opacity-50"
+                      className="inline-flex items-center justify-center gap-2 bg-white/10 hover:bg-white/15 text-[--color-text-primary] text-[11px] font-bold px-6 py-3 rounded-lg transition-all uppercase tracking-widest disabled:opacity-50"
                     >
                       {loading && <Loader2 className="w-3 h-3 animate-spin" />}
                       Update Password

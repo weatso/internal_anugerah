@@ -153,7 +153,7 @@ export default function TransactionsPage() {
         </div>
         <button
           onClick={() => setShowForm(true)}
-          className="flex items-center gap-2 bg-[#D4AF37] text-[#050505] font-bold px-4 py-2 rounded-md text-sm hover:bg-[#F5D678] transition-all uppercase tracking-widest shadow-lg shadow-[#D4AF37]/10"
+          className="flex items-center gap-2 bg-[#D4AF37] text-[--color-bg-primary] font-bold px-4 py-2 rounded-md text-sm hover:bg-[#F5D678] transition-all uppercase tracking-widest shadow-lg shadow-[#D4AF37]/10"
         >
           <Plus className="w-4 h-4" /> Tambah Transaksi
         </button>
@@ -223,7 +223,7 @@ export default function TransactionsPage() {
                         <span className={cn('px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider', tx.parsedType === 'INCOME' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500')}>
                           {tx.parsedType}
                         </span>
-                        <span className="text-white text-xs font-bold">{tx.category?.account_name || 'N/A'}</span>
+                        <span className="text-[--color-text-primary] text-xs font-bold">{tx.category?.account_name || 'N/A'}</span>
                       </div>
                       <p className="text-gray-400 text-xs truncate max-w-[200px]">{tx.description}</p>
                       <p className="text-[10px] text-gray-500 mt-1">Via: {tx.bank?.account_name || 'Unknown Bank'}</p>
@@ -267,10 +267,10 @@ export default function TransactionsPage() {
           <div className="glass-card w-full max-w-md p-6 border-[#D4AF37]/20 border">
             <div className="flex items-center justify-between mb-5">
               <div>
-                <h2 className="text-white font-bold">Input Transaksi Baru</h2>
+                <h2 className="text-[--color-text-primary] font-bold">Input Transaksi Baru</h2>
                 <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-1">Sistem Ledger Otomatis</p>
               </div>
-              <button onClick={() => setShowForm(false)} className="text-[--color-text-muted] hover:text-white bg-white/5 p-1.5 rounded"><X className="w-4 h-4" /></button>
+              <button onClick={() => setShowForm(false)} className="text-[--color-text-muted] hover:text-[--color-text-primary] bg-white/5 p-1.5 rounded"><X className="w-4 h-4" /></button>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="flex gap-2">
@@ -290,7 +290,7 @@ export default function TransactionsPage() {
                   <label className="text-[--color-text-muted] text-xs uppercase tracking-widest mb-1.5 block">Tanggal Transaksi</label>
                   <input type="date" required value={form.transaction_date}
                     onChange={e => setForm(f => ({ ...f, transaction_date: e.target.value }))}
-                    className="w-full bg-black/50 border border-white/10 rounded-md px-4 py-2.5 text-white text-sm focus:outline-none focus:border-[#D4AF37]/50"
+                    className="w-full bg-black/50 border border-white/10 rounded-md px-4 py-2.5 text-[--color-text-primary] text-sm focus:outline-none focus:border-[#D4AF37]/50"
                   />
                 </div>
                 <div>
@@ -301,14 +301,14 @@ export default function TransactionsPage() {
                       setForm(f => ({ ...f, amount: val ? parseInt(val).toLocaleString('id-ID') : '' }))
                     }}
                     placeholder="5.000.000"
-                    className="w-full bg-black/50 border border-white/10 rounded-md px-4 py-2.5 text-white text-sm focus:outline-none focus:border-[#D4AF37]/50"
+                    className="w-full bg-black/50 border border-white/10 rounded-md px-4 py-2.5 text-[--color-text-primary] text-sm focus:outline-none focus:border-[#D4AF37]/50"
                   />
                 </div>
               </div>
               <div>
                 <label className="text-[--color-text-muted] text-xs uppercase tracking-widest mb-1.5 block">Rekening Bank (Kas)</label>
                 <select required value={form.bank_account_id} onChange={e => setForm(f => ({ ...f, bank_account_id: e.target.value }))}
-                  className="w-full bg-black/50 border border-white/10 rounded-md px-4 py-2.5 text-white text-sm focus:outline-none focus:border-[#D4AF37]/50">
+                  className="w-full bg-black/50 border border-white/10 rounded-md px-4 py-2.5 text-[--color-text-primary] text-sm focus:outline-none focus:border-[#D4AF37]/50">
                   <option value="">Pilih rekening...</option>
                   {banks.map(b => <option key={b.id} value={b.id}>{b.account_code} - {b.account_name}</option>)}
                 </select>
@@ -316,7 +316,7 @@ export default function TransactionsPage() {
               <div>
                 <label className="text-[--color-text-muted] text-xs uppercase tracking-widest mb-1.5 block">Kategori Jurnal (Akun)</label>
                 <select required value={form.category_id} onChange={e => setForm(f => ({ ...f, category_id: e.target.value }))}
-                  className="w-full bg-black/50 border border-white/10 rounded-md px-4 py-2.5 text-white text-sm focus:outline-none focus:border-[#D4AF37]/50">
+                  className="w-full bg-black/50 border border-white/10 rounded-md px-4 py-2.5 text-[--color-text-primary] text-sm focus:outline-none focus:border-[#D4AF37]/50">
                   <option value="">Pilih kategori KAP...</option>
                   {availableCategories.map(c => <option key={c.id} value={c.id}>{c.account_code} - {c.account_name}</option>)}
                 </select>
@@ -326,7 +326,7 @@ export default function TransactionsPage() {
                 <input type="text" required value={form.description}
                   onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
                   placeholder="Pembayaran / Penagihan..."
-                  className="w-full bg-black/50 border border-white/10 rounded-md px-4 py-2.5 text-white text-sm focus:outline-none focus:border-[#D4AF37]/50"
+                  className="w-full bg-black/50 border border-white/10 rounded-md px-4 py-2.5 text-[--color-text-primary] text-sm focus:outline-none focus:border-[#D4AF37]/50"
                 />
               </div>
               <div>
@@ -339,7 +339,7 @@ export default function TransactionsPage() {
                 </button>
               </div>
               <button type="submit" disabled={submitting}
-                className="w-full bg-[#D4AF37] text-[#050505] font-bold py-3.5 rounded-md text-sm hover:bg-[#F5D678] transition-colors disabled:opacity-50 flex items-center justify-center gap-2 uppercase tracking-widest mt-4">
+                className="w-full bg-[#D4AF37] text-[--color-bg-primary] font-bold py-3.5 rounded-md text-sm hover:bg-[#F5D678] transition-colors disabled:opacity-50 flex items-center justify-center gap-2 uppercase tracking-widest mt-4">
                 {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Merekam Jurnal...</> : 'Proses Jurnal Transaksi'}
               </button>
             </form>

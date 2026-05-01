@@ -140,9 +140,9 @@ export default function MasterDataPage() {
       </div>
 
       <div className="flex flex-wrap gap-2 mt-6 mb-8 border-b border-white/5 pb-4">
-        <button onClick={() => setActiveTab('accounts')} className={`px-4 py-2 rounded-lg text-[10px] uppercase tracking-widest font-bold transition-all flex items-center gap-2 ${activeTab === 'accounts' ? 'bg-[#D4AF37]/15 text-[#D4AF37]' : 'text-gray-500 hover:text-white'}`}><Landmark className="w-4 h-4" /> Chart of Accounts</button>
-        <button onClick={() => setActiveTab('stakeholders')} className={`px-4 py-2 rounded-lg text-[10px] uppercase tracking-widest font-bold transition-all flex items-center gap-2 ${activeTab === 'stakeholders' ? 'bg-[#D4AF37]/15 text-[#D4AF37]' : 'text-gray-500 hover:text-white'}`}><Users className="w-4 h-4" /> Stakeholders</button>
-        <button onClick={() => setActiveTab('limit')} className={`px-4 py-2 rounded-lg text-[10px] uppercase tracking-widest font-bold transition-all flex items-center gap-2 ${activeTab === 'limit' ? 'bg-[#D4AF37]/15 text-[#D4AF37]' : 'text-gray-500 hover:text-white'}`}><PiggyBank className="w-4 h-4" /> Budget Limits</button>
+        <button onClick={() => setActiveTab('accounts')} className={`px-4 py-2 rounded-lg text-[10px] uppercase tracking-widest font-bold transition-all flex items-center gap-2 ${activeTab === 'accounts' ? 'bg-[#D4AF37]/15 text-[#D4AF37]' : 'text-gray-500 hover:text-[--color-text-primary]'}`}><Landmark className="w-4 h-4" /> Chart of Accounts</button>
+        <button onClick={() => setActiveTab('stakeholders')} className={`px-4 py-2 rounded-lg text-[10px] uppercase tracking-widest font-bold transition-all flex items-center gap-2 ${activeTab === 'stakeholders' ? 'bg-[#D4AF37]/15 text-[#D4AF37]' : 'text-gray-500 hover:text-[--color-text-primary]'}`}><Users className="w-4 h-4" /> Stakeholders</button>
+        <button onClick={() => setActiveTab('limit')} className={`px-4 py-2 rounded-lg text-[10px] uppercase tracking-widest font-bold transition-all flex items-center gap-2 ${activeTab === 'limit' ? 'bg-[#D4AF37]/15 text-[#D4AF37]' : 'text-gray-500 hover:text-[--color-text-primary]'}`}><PiggyBank className="w-4 h-4" /> Budget Limits</button>
       </div>
 
       <AnimatePresence mode="wait">
@@ -150,11 +150,11 @@ export default function MasterDataPage() {
           <motion.div key="accounts" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             <div className="lg:col-span-1">
               <div className="glass-card p-6 sticky top-8 border border-white/5">
-                <h2 className="text-sm font-bold text-white mb-4">Tambah Akun KAP</h2>
+                <h2 className="text-sm font-bold text-[--color-text-primary] mb-4">Tambah Akun KAP</h2>
                 <form onSubmit={handleSaveAccount} className="space-y-4">
                   <div>
                     <label className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Klasifikasi Akun</label>
-                    <select value={accForm.account_class} onChange={e=>setAccForm({...accForm, account_class: e.target.value as AccountClass})} className="w-full bg-black/50 border border-white/10 rounded-md px-3 py-2 text-sm text-white mt-1 focus:border-[#D4AF37]/50">
+                    <select value={accForm.account_class} onChange={e=>setAccForm({...accForm, account_class: e.target.value as AccountClass})} className="w-full bg-black/50 border border-white/10 rounded-md px-3 py-2 text-sm text-[--color-text-primary] mt-1 focus:border-[#D4AF37]/50">
                       <option value="ASSET">Aset (Kas/Bank/Piutang)</option>
                       <option value="LIABILITY">Liabilitas (Utang/Pajak)</option>
                       <option value="EQUITY">Ekuitas (Modal/Laba)</option>
@@ -165,18 +165,18 @@ export default function MasterDataPage() {
                   </div>
                   <div>
                     <label className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Nama Akun</label>
-                    <input type="text" required value={accForm.account_name} onChange={e=>setAccForm({...accForm, account_name: e.target.value})} className="w-full bg-black/50 border border-white/10 rounded-md px-3 py-2 text-sm text-white mt-1 focus:border-[#D4AF37]/50" placeholder="e.g. Kas Besar, Pendapatan SMM" />
+                    <input type="text" required value={accForm.account_name} onChange={e=>setAccForm({...accForm, account_name: e.target.value})} className="w-full bg-black/50 border border-white/10 rounded-md px-3 py-2 text-sm text-[--color-text-primary] mt-1 focus:border-[#D4AF37]/50" placeholder="e.g. Kas Besar, Pendapatan SMM" />
                   </div>
                   {accForm.account_class === 'ASSET' && (
                     <label className="flex items-center gap-2 cursor-pointer mt-2 bg-white/5 p-3 rounded-md">
                       <input type="checkbox" checked={accForm.is_bank} onChange={e=>setAccForm({...accForm, is_bank: e.target.checked})} className="accent-[#D4AF37] w-4 h-4" />
-                      <span className="text-xs text-white">Akun ini adalah Rekening Bank (Bisa dipilih saat input transaksi riil)</span>
+                      <span className="text-xs text-[--color-text-primary]">Akun ini adalah Rekening Bank (Bisa dipilih saat input transaksi riil)</span>
                     </label>
                   )}
                   <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-md mt-2">
                     <p className="text-[10px] text-blue-400 leading-relaxed">Sistem akan secara otomatis me-<i>generate</i> Kode KAP sesuai urutan kelas tanpa perlu input manual.</p>
                   </div>
-                  <button type="submit" disabled={loading} className="w-full bg-white/10 hover:bg-[#D4AF37]/20 text-white font-bold py-2.5 rounded-md transition-all text-xs uppercase tracking-widest mt-2">{loading ? 'Saving...' : 'Buat Akun'}</button>
+                  <button type="submit" disabled={loading} className="w-full bg-white/10 hover:bg-[#D4AF37]/20 text-[--color-text-primary] font-bold py-2.5 rounded-md transition-all text-xs uppercase tracking-widest mt-2">{loading ? 'Saving...' : 'Buat Akun'}</button>
                 </form>
               </div>
             </div>
@@ -193,11 +193,11 @@ export default function MasterDataPage() {
                         <div className="flex items-center gap-3">
                           <span className="text-[10px] font-mono text-gray-400 bg-white/5 px-1.5 py-0.5 rounded">{acc.account_code}</span>
                           <div>
-                            <p className="font-bold text-white text-xs">{acc.account_name}</p>
+                            <p className="font-bold text-[--color-text-primary] text-xs">{acc.account_name}</p>
                             {acc.is_bank && <span className="text-[9px] text-emerald-400 font-bold uppercase tracking-widest">Bank Rekening</span>}
                           </div>
                         </div>
-                        <button onClick={() => toggleAccountStatus(acc.id, acc.is_active)} className="text-[10px] text-gray-500 hover:text-white px-2 py-1 uppercase font-bold tracking-widest">
+                        <button onClick={() => toggleAccountStatus(acc.id, acc.is_active)} className="text-[10px] text-gray-500 hover:text-[--color-text-primary] px-2 py-1 uppercase font-bold tracking-widest">
                           {acc.is_active ? 'Matikan' : 'Aktifkan'}
                         </button>
                       </div>
@@ -213,28 +213,28 @@ export default function MasterDataPage() {
           <motion.div key="stakeholders" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-1">
               <div className="glass-card p-6 border border-white/5">
-                <h2 className="text-sm font-bold text-white mb-4">Tambah Stakeholder</h2>
+                <h2 className="text-sm font-bold text-[--color-text-primary] mb-4">Tambah Stakeholder</h2>
                 <form onSubmit={handleSaveStakeholder} className="space-y-4">
                   <div>
                     <label className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Nama Lengkap</label>
-                    <input type="text" required value={stkForm.name} onChange={e=>setStkForm({...stkForm, name: e.target.value})} className="w-full bg-black/50 border border-white/10 rounded-md px-3 py-2 text-sm text-white mt-1 focus:border-[#D4AF37]/50" />
+                    <input type="text" required value={stkForm.name} onChange={e=>setStkForm({...stkForm, name: e.target.value})} className="w-full bg-black/50 border border-white/10 rounded-md px-3 py-2 text-sm text-[--color-text-primary] mt-1 focus:border-[#D4AF37]/50" />
                   </div>
                   <div>
                     <label className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Tipe Stakeholder</label>
-                    <select value={stkForm.type} onChange={e=>setStkForm({...stkForm, type: e.target.value as 'OWNER'|'INVESTOR'})} className="w-full bg-black/50 border border-white/10 rounded-md px-3 py-2 text-sm text-white mt-1 focus:border-[#D4AF37]/50">
+                    <select value={stkForm.type} onChange={e=>setStkForm({...stkForm, type: e.target.value as 'OWNER'|'INVESTOR'})} className="w-full bg-black/50 border border-white/10 rounded-md px-3 py-2 text-sm text-[--color-text-primary] mt-1 focus:border-[#D4AF37]/50">
                       <option value="OWNER">Pemilik Utama (Owner)</option>
                       <option value="INVESTOR">Investor Eksternal / Partner</option>
                     </select>
                   </div>
                   <div>
                     <label className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Persentase Saham (Equity) %</label>
-                    <input type="number" step="0.01" min="0" max="100" required value={stkForm.equity_percentage} onChange={e=>setStkForm({...stkForm, equity_percentage: parseFloat(e.target.value)})} className="w-full bg-black/50 border border-white/10 rounded-md px-3 py-2 text-sm text-white mt-1 focus:border-[#D4AF37]/50" />
+                    <input type="number" step="0.01" min="0" max="100" required value={stkForm.equity_percentage} onChange={e=>setStkForm({...stkForm, equity_percentage: parseFloat(e.target.value)})} className="w-full bg-black/50 border border-white/10 rounded-md px-3 py-2 text-sm text-[--color-text-primary] mt-1 focus:border-[#D4AF37]/50" />
                   </div>
                   <div>
                     <label className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Persentase Profit Split %</label>
-                    <input type="number" step="0.01" min="0" max="100" required value={stkForm.profit_split_percentage} onChange={e=>setStkForm({...stkForm, profit_split_percentage: parseFloat(e.target.value)})} className="w-full bg-black/50 border border-white/10 rounded-md px-3 py-2 text-sm text-white mt-1 focus:border-[#D4AF37]/50" />
+                    <input type="number" step="0.01" min="0" max="100" required value={stkForm.profit_split_percentage} onChange={e=>setStkForm({...stkForm, profit_split_percentage: parseFloat(e.target.value)})} className="w-full bg-black/50 border border-white/10 rounded-md px-3 py-2 text-sm text-[--color-text-primary] mt-1 focus:border-[#D4AF37]/50" />
                   </div>
-                  <button type="submit" disabled={loading} className="w-full bg-white/10 hover:bg-[#D4AF37]/20 text-white font-bold py-2.5 rounded-md transition-all text-xs uppercase tracking-widest mt-2">{loading ? 'Saving...' : 'Simpan Stakeholder'}</button>
+                  <button type="submit" disabled={loading} className="w-full bg-white/10 hover:bg-[#D4AF37]/20 text-[--color-text-primary] font-bold py-2.5 rounded-md transition-all text-xs uppercase tracking-widest mt-2">{loading ? 'Saving...' : 'Simpan Stakeholder'}</button>
                 </form>
               </div>
             </div>
@@ -247,13 +247,13 @@ export default function MasterDataPage() {
                   <div key={s.id} className="glass-card p-5 flex items-center justify-between border-l-2 border-l-[#D4AF37] border-y border-r border-white/5">
                     <div>
                       <div className="flex items-center gap-3 mb-1">
-                        <h3 className="font-bold text-white text-base">{s.name}</h3>
-                        <span className="text-[9px] bg-white/10 text-white px-2 py-0.5 rounded uppercase tracking-widest font-bold">{s.type}</span>
+                        <h3 className="font-bold text-[--color-text-primary] text-base">{s.name}</h3>
+                        <span className="text-[9px] bg-white/10 text-[--color-text-primary] px-2 py-0.5 rounded uppercase tracking-widest font-bold">{s.type}</span>
                       </div>
                       <div className="flex items-center gap-6 mt-2 text-xs">
                         <div>
                           <p className="text-gray-500 uppercase tracking-widest text-[9px] font-bold">Saham / Kepemilikan</p>
-                          <p className="text-white font-mono mt-0.5">{s.equity_percentage}%</p>
+                          <p className="text-[--color-text-primary] font-mono mt-0.5">{s.equity_percentage}%</p>
                         </div>
                         <div>
                           <p className="text-gray-500 uppercase tracking-widest text-[9px] font-bold">Hak Profit Split</p>
@@ -271,7 +271,7 @@ export default function MasterDataPage() {
         {activeTab === 'limit' && (
           <motion.div key="limit" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-4">
             <div className="glass-card p-6 mb-4 border border-white/5">
-              <h2 className="text-sm font-bold text-white">Division Auto-Approve Limits</h2>
+              <h2 className="text-sm font-bold text-[--color-text-primary]">Division Auto-Approve Limits</h2>
               <p className="text-xs text-gray-400 mt-1">Atur limit pengeluaran per bulan bagi Head Division untuk melakukan auto-approve tanpa menunggu persetujuan CEO.</p>
             </div>
             
@@ -279,7 +279,7 @@ export default function MasterDataPage() {
               {limits.map(limit => (
                 <div key={limit.entity_id} className="glass-card p-5 relative overflow-hidden group border border-white/5">
                   <div className="absolute top-0 right-0 w-16 h-16 bg-[#D4AF37]/5 rounded-bl-full -z-10 transition-transform group-hover:scale-150" />
-                  <h3 className="font-bold text-white mb-4">{limit.entity?.name}</h3>
+                  <h3 className="font-bold text-[--color-text-primary] mb-4">{limit.entity?.name}</h3>
                   <div className="space-y-4">
                     <div>
                       <label className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Limit Bulanan (Rp)</label>
@@ -287,13 +287,13 @@ export default function MasterDataPage() {
                         type="number" 
                         defaultValue={limit.monthly_auto_approve_limit} 
                         onBlur={(e) => handleUpdateLimit(limit.entity_id, Number(e.target.value))}
-                        className="w-full bg-black/50 border border-white/10 rounded-md px-3 py-2 text-sm text-white mt-1 focus:border-[#D4AF37]/50" 
+                        className="w-full bg-black/50 border border-white/10 rounded-md px-3 py-2 text-sm text-[--color-text-primary] mt-1 focus:border-[#D4AF37]/50" 
                       />
                     </div>
                     <div className="flex justify-between items-end p-3 rounded bg-white/5 border border-white/5">
                       <div>
                         <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold mb-1">Terpakai Bulan Ini</p>
-                        <p className="text-sm font-bold text-white">Rp {Number(limit.current_month_usage).toLocaleString('id-ID')}</p>
+                        <p className="text-sm font-bold text-[--color-text-primary]">Rp {Number(limit.current_month_usage).toLocaleString('id-ID')}</p>
                       </div>
                       <div className="text-right">
                         <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold mb-1">Reset</p>

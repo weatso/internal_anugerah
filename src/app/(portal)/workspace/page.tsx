@@ -118,7 +118,7 @@ export default function WorkspacePage() {
                       {log.status === 'SUBMITTED' && <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#f59e0b]/10 text-[#f59e0b] border border-[#f59e0b]/20 uppercase tracking-widest">Submitted</span>}
                     </div>
                     
-                    <h2 className="text-[--color-text-primary] font-bold text-base md:text-lg truncate group-hover:text-white transition-colors">
+                    <h2 className="text-[--color-text-primary] font-bold text-base md:text-lg truncate group-hover:text-[--color-text-primary] transition-colors">
                       {log.title}
                     </h2>
                     
@@ -134,7 +134,7 @@ export default function WorkspacePage() {
                      <MetadataPreview logType={log.log_type} meta={meta} color={eColor} />
                   </div>
 
-                  <div className="hidden md:flex shrink-0 items-center justify-center p-2 text-[--color-text-muted] group-hover:text-white transition-colors">
+                  <div className="hidden md:flex shrink-0 items-center justify-center p-2 text-[--color-text-muted] group-hover:text-[--color-text-primary] transition-colors">
                     <ChevronRight className="w-5 h-5" />
                   </div>
                 </Link>

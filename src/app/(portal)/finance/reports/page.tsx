@@ -194,15 +194,15 @@ export default function ReportsPage() {
         
         {/* Controllers */}
         <div className="flex flex-wrap items-center gap-3 bg-black/50 p-2 rounded-lg border border-white/10">
-          <select value={filterDivision} onChange={e => setFilterDivision(e.target.value)} disabled={reportType === 'NERACA' || reportType === 'ARUS_KAS'} className="bg-transparent text-white text-xs font-bold disabled:opacity-50 cursor-pointer outline-none">
-            <option value="ALL" className="bg-[#050505]">Semua Divisi (Konsolidasi)</option>
-            {entities.map(e => <option key={e.id} value={e.id} className="bg-[#050505]">{e.name}</option>)}
+          <select value={filterDivision} onChange={e => setFilterDivision(e.target.value)} disabled={reportType === 'NERACA' || reportType === 'ARUS_KAS'} className="bg-transparent text-[--color-text-primary] text-xs font-bold disabled:opacity-50 cursor-pointer outline-none">
+            <option value="ALL" className="bg-[--color-bg-primary]">Semua Divisi (Konsolidasi)</option>
+            {entities.map(e => <option key={e.id} value={e.id} className="bg-[--color-bg-primary]">{e.name}</option>)}
           </select>
-          <select value={filterMonth} onChange={e => setFilterMonth(Number(e.target.value))} className="bg-transparent text-white text-xs font-bold cursor-pointer outline-none">
-            {Array.from({ length: 12 }).map((_, i) => <option key={i} value={i + 1} className="bg-[#050505]">{new Date(0, i).toLocaleString('id-ID', { month: 'long' })}</option>)}
+          <select value={filterMonth} onChange={e => setFilterMonth(Number(e.target.value))} className="bg-transparent text-[--color-text-primary] text-xs font-bold cursor-pointer outline-none">
+            {Array.from({ length: 12 }).map((_, i) => <option key={i} value={i + 1} className="bg-[--color-bg-primary]">{new Date(0, i).toLocaleString('id-ID', { month: 'long' })}</option>)}
           </select>
-          <select value={filterYear} onChange={e => setFilterYear(Number(e.target.value))} className="bg-transparent text-white text-xs font-bold cursor-pointer outline-none">
-            {[2025, 2026, 2027].map(y => <option key={y} value={y} className="bg-[#050505]">{y}</option>)}
+          <select value={filterYear} onChange={e => setFilterYear(Number(e.target.value))} className="bg-transparent text-[--color-text-primary] text-xs font-bold cursor-pointer outline-none">
+            {[2025, 2026, 2027].map(y => <option key={y} value={y} className="bg-[--color-bg-primary]">{y}</option>)}
           </select>
           <button className="text-[#D4AF37] hover:text-[#F5D678] transition-colors p-1"><Download className="w-4 h-4" /></button>
         </div>
@@ -212,7 +212,7 @@ export default function ReportsPage() {
       <div className="flex gap-2 border-b border-white/5 pb-4">
         {(['LABA_RUGI', 'NERACA', 'ARUS_KAS'] as const).map(type => (
           <button key={type} onClick={() => setReportType(type)}
-            className={`px-4 py-2 rounded-md text-[10px] font-bold transition-all uppercase tracking-widest ${reportType === type ? 'bg-[#D4AF37]/15 text-[#D4AF37]' : 'text-gray-500 hover:text-white'}`}>
+            className={`px-4 py-2 rounded-md text-[10px] font-bold transition-all uppercase tracking-widest ${reportType === type ? 'bg-[#D4AF37]/15 text-[#D4AF37]' : 'text-gray-500 hover:text-[--color-text-primary]'}`}>
             {type.replace('_', ' ')}
           </button>
         ))}
@@ -222,7 +222,7 @@ export default function ReportsPage() {
       {reportType === 'LABA_RUGI' && (
         <div className="glass-card p-8 border border-white/5">
           <div className="text-center mb-8 border-b border-white/10 pb-6">
-            <h2 className="text-xl font-black text-white">LAPORAN LABA RUGI</h2>
+            <h2 className="text-xl font-black text-[--color-text-primary]">LAPORAN LABA RUGI</h2>
             <p className="text-gray-400 text-sm mt-1">Periode: {new Date(filterYear, filterMonth - 1).toLocaleString('id-ID', { month: 'long', year: 'numeric' })}</p>
             {filterDivision !== 'ALL' && <p className="text-[#D4AF37] text-xs font-bold mt-2 bg-[#D4AF37]/10 inline-block px-3 py-1 rounded">Divisi: {entities.find(e => e.id === filterDivision)?.name}</p>}
           </div>
@@ -234,7 +234,7 @@ export default function ReportsPage() {
               {lr.revenues.map(a => (
                 <div key={a.id} className="flex justify-between py-1.5 text-sm text-gray-300"><span>{a.account_name}</span><span>{formatRupiah(a.balance)}</span></div>
               ))}
-              <div className="flex justify-between py-2 text-sm font-bold text-white border-t border-white/10 mt-2"><span>Total Pendapatan</span><span>{formatRupiah(lr.totalRevenue)}</span></div>
+              <div className="flex justify-between py-2 text-sm font-bold text-[--color-text-primary] border-t border-white/10 mt-2"><span>Total Pendapatan</span><span>{formatRupiah(lr.totalRevenue)}</span></div>
             </div>
 
             {/* COGS */}
@@ -243,7 +243,7 @@ export default function ReportsPage() {
               {lr.cogs.length === 0 ? <p className="text-xs text-gray-500 italic">Tidak ada transaksi.</p> : lr.cogs.map(a => (
                 <div key={a.id} className="flex justify-between py-1.5 text-sm text-gray-300"><span>{a.account_name}</span><span>{formatRupiah(a.balance)}</span></div>
               ))}
-              <div className="flex justify-between py-2 text-sm font-bold text-white border-t border-white/10 mt-2"><span>Total HPP</span><span>{formatRupiah(lr.totalCogs)}</span></div>
+              <div className="flex justify-between py-2 text-sm font-bold text-[--color-text-primary] border-t border-white/10 mt-2"><span>Total HPP</span><span>{formatRupiah(lr.totalCogs)}</span></div>
             </div>
 
             {/* Gross Profit */}
@@ -257,7 +257,7 @@ export default function ReportsPage() {
               {lr.expenses.length === 0 ? <p className="text-xs text-gray-500 italic">Tidak ada transaksi.</p> : lr.expenses.map(a => (
                 <div key={a.id} className="flex justify-between py-1.5 text-sm text-gray-300"><span>{a.account_name}</span><span>{formatRupiah(a.balance)}</span></div>
               ))}
-              <div className="flex justify-between py-2 text-sm font-bold text-white border-t border-white/10 mt-2"><span>Total Biaya Operasional</span><span>{formatRupiah(lr.totalExpense)}</span></div>
+              <div className="flex justify-between py-2 text-sm font-bold text-[--color-text-primary] border-t border-white/10 mt-2"><span>Total Biaya Operasional</span><span>{formatRupiah(lr.totalExpense)}</span></div>
             </div>
 
             {/* Net Income */}
@@ -272,7 +272,7 @@ export default function ReportsPage() {
       {reportType === 'NERACA' && (
         <div className="glass-card p-8 border border-white/5">
           <div className="text-center mb-8 border-b border-white/10 pb-6">
-            <h2 className="text-xl font-black text-white">NERACA (BALANCE SHEET)</h2>
+            <h2 className="text-xl font-black text-[--color-text-primary]">NERACA (BALANCE SHEET)</h2>
             <p className="text-gray-400 text-sm mt-1">Per {new Date(filterYear, filterMonth, 0).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
             <p className="text-blue-400 text-xs font-bold mt-2 bg-blue-500/10 inline-block px-3 py-1 rounded">Konsolidasi Holding</p>
           </div>
@@ -314,7 +314,7 @@ export default function ReportsPage() {
                 </div>
               </div>
 
-              <div className="flex justify-between py-3 text-base font-black text-white border-t border-white/20 mt-4 bg-white/5 px-2 rounded">
+              <div className="flex justify-between py-3 text-base font-black text-[--color-text-primary] border-t border-white/20 mt-4 bg-white/5 px-2 rounded">
                 <span>TOTAL LIABILITAS & EKUITAS</span><span>{formatRupiah(nr.totalLiab + nr.totalEq)}</span>
               </div>
 
@@ -331,7 +331,7 @@ export default function ReportsPage() {
       {reportType === 'ARUS_KAS' && (
         <div className="glass-card p-8 border border-white/5">
           <div className="text-center mb-8 border-b border-white/10 pb-6">
-            <h2 className="text-xl font-black text-white">ARUS KAS (CASH FLOW)</h2>
+            <h2 className="text-xl font-black text-[--color-text-primary]">ARUS KAS (CASH FLOW)</h2>
             <p className="text-gray-400 text-sm mt-1">Periode: {new Date(filterYear, filterMonth - 1).toLocaleString('id-ID', { month: 'long', year: 'numeric' })}</p>
           </div>
 
@@ -343,7 +343,7 @@ export default function ReportsPage() {
                 {ak.cashIn.map((c, i) => (
                   <div key={i} className="bg-emerald-400/5 p-3 rounded border border-emerald-400/10 flex justify-between items-center">
                     <div>
-                      <p className="text-xs font-bold text-white">{c.account_name}</p>
+                      <p className="text-xs font-bold text-[--color-text-primary]">{c.account_name}</p>
                       <p className="text-[10px] text-gray-500 font-mono mt-0.5">{c.date} | {c.ref}</p>
                     </div>
                     <span className="text-emerald-400 font-bold text-sm">+{formatRupiah(c.amount)}</span>
@@ -362,7 +362,7 @@ export default function ReportsPage() {
                 {ak.cashOut.map((c, i) => (
                   <div key={i} className="bg-red-400/5 p-3 rounded border border-red-400/10 flex justify-between items-center">
                     <div>
-                      <p className="text-xs font-bold text-white">{c.account_name}</p>
+                      <p className="text-xs font-bold text-[--color-text-primary]">{c.account_name}</p>
                       <p className="text-[10px] text-gray-500 font-mono mt-0.5">{c.date} | {c.ref}</p>
                     </div>
                     <span className="text-red-400 font-bold text-sm">-{formatRupiah(c.amount)}</span>
@@ -379,7 +379,7 @@ export default function ReportsPage() {
           <div className="mt-8 border-t-2 border-[#D4AF37]/50 pt-6">
              <div className={`p-6 rounded-lg border-2 flex justify-between items-center ${ak.netCashFlow >= 0 ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
                 <div>
-                  <h3 className="text-white font-black text-lg">CASH FLOW BERSIH BULAN INI</h3>
+                  <h3 className="text-[--color-text-primary] font-black text-lg">CASH FLOW BERSIH BULAN INI</h3>
                   <p className="text-xs text-gray-400 mt-1">Selisih total uang masuk dan keluar pada bulan ini</p>
                 </div>
                 <span className={`text-3xl font-black ${ak.netCashFlow >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{formatRupiah(ak.netCashFlow)}</span>

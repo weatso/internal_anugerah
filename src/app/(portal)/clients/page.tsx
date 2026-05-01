@@ -86,7 +86,7 @@ export default function CRMMasterPage() {
     c.pic_name.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  if (loading && clients.length === 0) return <div className="p-8 text-white font-mono text-xs uppercase tracking-widest">Memuat Database Klien...</div>
+  if (loading && clients.length === 0) return <div className="p-8 text-[--color-text-primary] font-mono text-xs uppercase tracking-widest">Memuat Database Klien...</div>
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6 animate-[slide-up_0.4s_ease]">
@@ -95,7 +95,7 @@ export default function CRMMasterPage() {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-white/5 pb-6">
         <div>
           <p className="text-[#C5A028] text-xs uppercase tracking-[0.3em] font-bold mb-1">Commercial Hub</p>
-          <h1 className="text-white text-2xl font-black tracking-tighter">Client Relationship Management</h1>
+          <h1 className="text-[--color-text-primary] text-2xl font-black tracking-tighter">Client Relationship Management</h1>
           <p className="text-gray-500 text-sm mt-1">Master Data Perusahaan & Klien Holding</p>
         </div>
         <div className="flex items-center gap-3">
@@ -106,7 +106,7 @@ export default function CRMMasterPage() {
               placeholder="Cari Klien..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="pl-9 pr-4 py-2 bg-[#0A0A0A] border border-white/10 rounded-sm text-sm text-white focus:border-[#C5A028] focus:outline-none w-64 transition-all"
+              className="pl-9 pr-4 py-2 bg-[--color-bg-elevated] border border-white/10 rounded-sm text-sm text-[--color-text-primary] focus:border-[#C5A028] focus:outline-none w-64 transition-all"
             />
           </div>
           <button onClick={() => setShowForm(true)} className="flex items-center gap-2 bg-[#C5A028] text-black font-bold px-4 py-2 rounded-sm text-xs uppercase tracking-widest hover:bg-[#D4AF37] transition-colors">
@@ -125,7 +125,7 @@ export default function CRMMasterPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="bg-[#0A0A0A] border-b border-white/5 text-[10px] uppercase tracking-widest font-bold text-gray-400">
+              <thead className="bg-[--color-bg-elevated] border-b border-white/5 text-[10px] uppercase tracking-widest font-bold text-gray-400">
                 <tr>
                   <th className="px-6 py-4">Perusahaan</th>
                   <th className="px-6 py-4">Informasi PIC</th>
@@ -137,7 +137,7 @@ export default function CRMMasterPage() {
                 {filteredClients.map(client => (
                   <tr key={client.id} className="hover:bg-white/[0.02] transition-colors">
                     <td className="px-6 py-4">
-                      <p className="font-bold text-white mb-0.5">{client.company_name}</p>
+                      <p className="font-bold text-[--color-text-primary] mb-0.5">{client.company_name}</p>
                       <p className="text-[10px] text-gray-500 uppercase tracking-wider">{client.industry_type || 'Unknown Industry'}</p>
                       {client.npwp && <p className="text-[9px] font-mono text-gray-600 mt-1">NPWP: {client.npwp}</p>}
                     </td>
@@ -176,12 +176,12 @@ export default function CRMMasterPage() {
       {showForm && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="glass-card w-full max-w-2xl overflow-hidden border border-white/10">
-            <div className="flex items-center justify-between p-6 border-b border-white/5 bg-[#0A0A0A]">
+            <div className="flex items-center justify-between p-6 border-b border-white/5 bg-[--color-bg-elevated]">
               <div>
-                <h2 className="text-white font-bold text-lg">Registrasi Klien Baru</h2>
+                <h2 className="text-[--color-text-primary] font-bold text-lg">Registrasi Klien Baru</h2>
                 <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-1">Database Holding Anugerah Ventures</p>
               </div>
-              <button onClick={() => setShowForm(false)} className="text-gray-500 hover:text-white transition-colors p-1"><X size={20} /></button>
+              <button onClick={() => setShowForm(false)} className="text-gray-500 hover:text-[--color-text-primary] transition-colors p-1"><X size={20} /></button>
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-8">
@@ -204,7 +204,7 @@ export default function CRMMasterPage() {
                     >
                       <option value="" disabled>Pilih Sektor...</option>
                       {INDUSTRY_OPTIONS.map((option) => (
-                        <option key={option} value={option} className="bg-[#0A0A0A] text-white">
+                        <option key={option} value={option} className="bg-[--color-bg-elevated] text-[--color-text-primary]">
                           {option}
                         </option>
                       ))}
@@ -245,7 +245,7 @@ export default function CRMMasterPage() {
               </div>
 
               <div className="pt-4 flex justify-end gap-3">
-                <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-xs font-bold text-gray-400 hover:text-white uppercase tracking-widest transition-colors">Batal</button>
+                <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-xs font-bold text-gray-400 hover:text-[--color-text-primary] uppercase tracking-widest transition-colors">Batal</button>
                 <button
                   type="submit"
                   disabled={submitting}

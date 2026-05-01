@@ -118,7 +118,7 @@ export function StaffWorkspace() {
               <Link key={log.id} href={`/workspace/${log.id}`}
                 className="flex items-start justify-between px-5 py-3 hover:bg-white/[0.015] transition-colors group">
                 <div className="min-w-0 flex-1">
-                  <p className="text-[--color-text-primary] text-sm font-medium truncate group-hover:text-white transition-colors">{log.title}</p>
+                  <p className="text-[--color-text-primary] text-sm font-medium truncate group-hover:text-[--color-text-primary] transition-colors">{log.title}</p>
                   <p className="text-[--color-text-muted] text-xs mt-0.5">{formatDate(log.created_at)}</p>
                 </div>
                 <span className={`ml-4 shrink-0 text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${{

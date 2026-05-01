@@ -18,12 +18,28 @@ export interface Entity {
 
 export interface Profile {
   id: string
-  entity_id: string
+  entity_id: string | null  // Primary/home entity (kept for backward compat)
   full_name: string
   avatar_url?: string | null
-  roles: UserRole[] // <-- INI YANG MENGHILANGKAN ERROR ANDA
+  roles: UserRole[]          // Legacy array — masih dipakai di beberapa tempat
   created_at: string
   entity?: Entity
+}
+
+// ─── NEW: Multi-role + Multi-entity assignment ────────────────────────────────
+// Merepresentasikan: "User X punya role Y di Entity Z"
+export interface UserRoleAssignment {
+  id: string
+  user_id: string
+  entity_id: string
+  role: UserRole
+  created_at: string
+  entity?: Entity
+}
+
+// Helper: Profile enriched dengan user_roles dari tabel baru
+export interface EnrichedProfile extends Profile {
+  userRoles: UserRoleAssignment[]
 }
 
 export type AccountClass = 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'COGS' | 'EXPENSE'
@@ -58,6 +74,8 @@ export interface JournalEntry {
   created_by: string | null
   approved_by: string | null
   created_at: string
+  is_reversed: boolean
+  reversed_journal_id: string | null
   entity?: Entity
   creator?: Profile
   approver?: Profile
@@ -204,8 +222,8 @@ export interface WorkspaceLog {
   created_by: string | null
   title: string
   content: string
-  log_type: WorkspaceType
-  metadata: WorkspaceMetadata | null
+  log_type?: WorkspaceType
+  metadata?: WorkspaceMetadata | null
   attachments: LogAttachment[] | null
   status: LogStatus
   assigned_to: string | null
@@ -235,7 +253,7 @@ export interface SalesKitItem {
   creator?: Profile
 }
 
-// ─── RBAC HIERARCHY LOGIC ──────────────────────────────────────────────────
+// ─── RBAC HIERARCHY LOGIC ─────────────────────────────────────────────────────
 
 export const ROLE_HIERARCHY: Record<UserRole, number> = {
   CEO: 1,
@@ -245,9 +263,22 @@ export const ROLE_HIERARCHY: Record<UserRole, number> = {
   STAFF: 5
 };
 
+export const ROLE_LABELS: Record<UserRole, string> = {
+  CEO: 'CEO',
+  HEAD: 'Head Division',
+  FINANCE: 'Finance',
+  DESIGN: 'Design Team',
+  STAFF: 'Staff',
+}
+
 export const getHighestRole = (roles: UserRole[] | undefined | null): UserRole | null => {
   if (!roles || roles.length === 0) return null;
-  return roles.reduce((prev, curr) => 
+  return roles.reduce((prev, curr) =>
     ROLE_HIERARCHY[curr] < ROLE_HIERARCHY[prev] ? curr : prev
   , roles[0]);
 };
+
+// Extract unique roles from UserRoleAssignments
+export const getRolesFromAssignments = (assignments: UserRoleAssignment[]): UserRole[] => {
+  return [...new Set(assignments.map(a => a.role))]
+}

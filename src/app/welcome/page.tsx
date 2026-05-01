@@ -47,7 +47,7 @@ export default function WelcomePage() {
 
   return (
     <div
-      className="fixed inset-0 bg-[#050505] flex flex-col items-center justify-center overflow-hidden"
+      className="fixed inset-0 bg-[--color-bg-primary] flex flex-col items-center justify-center overflow-hidden"
       style={{
         transition: 'opacity 0.5s ease',
         opacity: visible ? 1 : 0,
@@ -75,7 +75,7 @@ export default function WelcomePage() {
         </p>
 
         <h1
-          className="text-white font-black tracking-tight"
+          className="text-[--color-text-primary] font-black tracking-tight"
           style={{
             fontSize: 'clamp(2.25rem, 8vw, 4rem)',
             lineHeight: 1.1,
@@ -91,7 +91,7 @@ export default function WelcomePage() {
         </h1>
 
         <p
-          className="text-neutral-500 text-sm mt-4"
+          className="text-[--color-text-muted] text-sm mt-4"
           style={{
             transform: visible ? 'translateY(0)' : 'translateY(16px)',
             opacity: visible ? 1 : 0,

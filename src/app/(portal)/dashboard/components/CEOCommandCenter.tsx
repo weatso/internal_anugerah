@@ -5,19 +5,22 @@ import Link from 'next/link'
 import { motion } from 'framer-motion'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
+  BarChart, Bar, PieChart, Pie, Cell, Sector,
 } from 'recharts'
-import { FileText, FolderKanban, Plus, TrendingDown, Wallet, Eye } from 'lucide-react'
+import {
+  FileText, FolderKanban, TrendingDown, Wallet,
+  CheckCircle2, TrendingUp, Clock,
+} from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/components/providers/UserProvider'
-import { formatRupiah, formatDate } from '@/lib/utils'
-import { getEntityAccentColor, getDivisionConfig } from '@/lib/division-config'
+import { formatRupiah } from '@/lib/utils'
+import { getEntityAccentColor } from '@/lib/division-config'
 import type { Entity } from '@/types'
 
 interface MonthlyPoint {
   month: string
   [entityName: string]: number | string
 }
-
 interface PLData {
   entity: Entity
   income: number
@@ -25,102 +28,164 @@ interface PLData {
   net: number
 }
 
-const FADE_UP = {
-  hidden: { opacity: 0, y: 20 },
-  show:   { opacity: 1, y: 0 },
+const FADE_UP = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }
+
+const getDivisionMetadata = (name: string | undefined) => {
+  const n = (name || '').toLowerCase()
+  if (n.includes('weatso')) return { desc: 'Enterprise IT Consultancy & Creative', logo: '/logos/weatso.svg' }
+  if (n.includes('colabz')) return { desc: 'Roblox Game Development Studio', logo: '/logos/colabz.png' }
+  if (n.includes('evory')) return { desc: 'Event Organizer & Management', logo: '/logos/evory.png' }
+  if (n.includes('lokal')) return { desc: 'F&B Retail & Franchise', logo: '/logos/lokal.png' }
+  return { desc: 'Divisi Operasional', logo: null }
 }
 
-export function CEOCommandCenter() {
-  const { profile, impersonate } = useUser()
+// Donut active shape
+const renderActiveShape = (props: any) => {
+  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, value, percent } = props
+  return (
+    <g>
+      <text x={cx} y={cy - 12} textAnchor="middle" fill="var(--text-primary)" fontSize={13} fontWeight={800}>
+        {payload.name}
+      </text>
+      <text x={cx} y={cy + 10} textAnchor="middle" fill={fill} fontSize={11} fontWeight={700}>
+        {(percent * 100).toFixed(1)}%
+      </text>
+      <text x={cx} y={cy + 26} textAnchor="middle" fill="var(--text-muted)" fontSize={10}>
+        {formatRupiah(value)}
+      </text>
+      <Sector cx={cx} cy={cy} innerRadius={innerRadius} outerRadius={outerRadius + 6}
+        startAngle={startAngle} endAngle={endAngle} fill={fill} />
+      <Sector cx={cx} cy={cy} innerRadius={innerRadius - 4} outerRadius={innerRadius - 2}
+        startAngle={startAngle} endAngle={endAngle} fill={fill} />
+    </g>
+  )
+}
+
+export default function CEOCommandCenter() {
+  const { profile, impersonate, effectiveEntityId } = useUser()
   const supabase = createClient()
 
-  const [entities, setEntities]             = useState<Entity[]>([])
-  const [plData, setPLData]                 = useState<PLData[]>([])
-  const [chartData, setChartData]           = useState<MonthlyPoint[]>([])
+  const [entities, setEntities]               = useState<Entity[]>([])
+  const [plData, setPLData]                   = useState<PLData[]>([])
+  const [chartData, setChartData]             = useState<MonthlyPoint[]>([])
   const [pendingInvoices, setPendingInvoices] = useState(0)
-  const [unreadLogs, setUnreadLogs]         = useState(0)
-  const [cashOnHand, setCashOnHand]         = useState(0)
-  const [burnRate, setBurnRate]             = useState(0)
-  const [loading, setLoading]               = useState(true)
+  const [unreadLogs, setUnreadLogs]           = useState(0)
+  const [cashOnHand, setCashOnHand]           = useState(0)
+  const [burnRate, setBurnRate]               = useState(0)
+  const [totalRevenueMTD, setTotalRevenueMTD] = useState(0)
+  const [activePieIndex, setActivePieIndex]   = useState(0)
+  const [loading, setLoading]                 = useState(true)
 
   useEffect(() => { fetchAll() }, [])
 
-  // MESIN BARU: Cerdas, Ringan, dan Menggunakan SQL Views KAP v2
   async function fetchAll() {
     setLoading(true)
+    try {
+      const [
+        { data: entitiesData },
+        { data: bankBalances },
+        { data: monthlyPL },
+        { count: invCount },
+        { count: logCount },
+      ] = await Promise.all([
+        supabase.from('entities').select('*').order('type').order('name'),
+        supabase.from('global_bank_balances').select('*'),
+        supabase.from('monthly_division_pl').select('*'),
+        supabase.from('invoices').select('id', { count: 'exact', head: true }).eq('status', 'PENDING_APPROVAL'),
+        supabase.from('workspace_logs').select('id', { count: 'exact', head: true }).eq('status', 'SUBMITTED'),
+      ])
 
-    const [
-      { data: entitiesData },
-      { data: bankBalances },
-      { data: monthlyPL },
-      { count: invCount },
-      { count: logCount },
-    ] = await Promise.all([
-      supabase.from('entities').select('*').order('type').order('name'),
-      supabase.from('global_bank_balances').select('*'), // Dihitung otomatis oleh Database
-      supabase.from('monthly_division_pl').select('*'), // Dihitung otomatis oleh Database
-      supabase.from('invoices').select('id', { count: 'exact', head: true }).eq('status', 'PENDING_APPROVAL'),
-      supabase.from('workspace_logs').select('id', { count: 'exact', head: true }).eq('status', 'SUBMITTED'),
-    ])
+      const divEntities = (entitiesData ?? []) as Entity[]
+      setEntities(divEntities)
 
-    const divEntities = (entitiesData ?? []) as Entity[]
-    setEntities(divEntities)
+      const totalCash = (bankBalances || []).reduce((sum, b) => sum + Number(b.current_balance), 0)
+      setCashOnHand(totalCash)
 
-    // ── 1. Cash on Hand (Langsung dari Ledger Bank) ────────────────────────
-    const totalCash = (bankBalances || []).reduce((sum, b) => sum + Number(b.current_balance), 0)
-    setCashOnHand(totalCash)
+      const plMap = new Map<string, PLData>()
+      const monthMap = new Map<string, MonthlyPoint>()
+      let totalExp = 0
+      const uniqueMonths = new Set<string>()
 
-    // ── 2. P&L & Chart Data Aggregation (Tanpa Looping Ribuan Jurnal) ──────
-    const plMap = new Map<string, PLData>()
-    const monthMap = new Map<string, MonthlyPoint>()
-    let totalExp = 0
-    let uniqueMonths = new Set()
+      // Current month for MTD
+      const nowMonth = new Date().toISOString().slice(0, 7) // e.g. "2026-05"
+      let mtdRevenue = 0
 
-    // Siapkan wadah per divisi
-    divEntities.forEach(e => {
-      plMap.set(e.id, { entity: e, income: 0, expense: 0, net: 0 })
-    })
-
-    if (monthlyPL) {
-      monthlyPL.forEach(row => {
-        const eId = row.entity_id
-        const eName = row.division_name
-        const month = row.month_period
-
-        uniqueMonths.add(month)
-        totalExp += Number(row.total_expense)
-
-        // Agregasi untuk Kartu Impersonate
-        if (plMap.has(eId)) {
-          const g = plMap.get(eId)!
-          g.income += Number(row.total_revenue)
-          g.expense += Number(row.total_expense)
-          g.net += Number(row.net_profit)
-        }
-
-        // Agregasi untuk Recharts
-        if (!monthMap.has(month)) monthMap.set(month, { month })
-        const pt = monthMap.get(month)!
-        pt[eName] = Number(row.net_profit)
+      divEntities.forEach(e => {
+        plMap.set(e.id, { entity: e, income: 0, expense: 0, net: 0 })
       })
+
+      if (monthlyPL) {
+        monthlyPL.forEach(row => {
+          const eId    = row.entity_id
+          const eName  = row.division_name
+          const month  = row.month_period
+
+          uniqueMonths.add(month)
+          totalExp += Number(row.total_expense)
+
+          if (month === nowMonth) {
+            mtdRevenue += Number(row.total_revenue)
+          }
+
+          if (plMap.has(eId)) {
+            const g = plMap.get(eId)!
+            g.income  += Number(row.total_revenue)
+            g.expense += Number(row.total_expense)
+            g.net     += Number(row.net_profit)
+          }
+
+          if (!monthMap.has(month)) monthMap.set(month, { month })
+          const pt = monthMap.get(month)!
+          pt[eName] = Number(row.net_profit)
+        })
+      }
+
+      setPLData(Array.from(plMap.values()))
+      setBurnRate(uniqueMonths.size > 0 ? totalExp / uniqueMonths.size : 0)
+      setChartData(Array.from(monthMap.values()).sort((a, b) => a.month.localeCompare(b.month)))
+      setTotalRevenueMTD(mtdRevenue)
+      setPendingInvoices(invCount ?? 0)
+      setUnreadLogs(logCount ?? 0)
+    } catch (error) {
+      console.error('Gagal menarik data CEO Dashboard:', error)
+    } finally {
+      setLoading(false)
     }
-
-    setPLData(Array.from(plMap.values()))
-    setBurnRate(uniqueMonths.size > 0 ? totalExp / uniqueMonths.size : 0)
-    setChartData(Array.from(monthMap.values()).sort((a, b) => a.month.localeCompare(b.month)))
-
-    setPendingInvoices(invCount ?? 0)
-    setUnreadLogs(logCount ?? 0)
-    setLoading(false)
   }
 
   const divisionEntities = entities.filter(e => e.type === 'DIVISION')
-  const firstName = profile?.full_name.split(' ')[0] ?? ''
+  const firstName        = profile?.full_name?.split(' ')[0] ?? 'Pemimpin'
+
+  // ── Derived metrics ──────────────────────────────────────────────────────
+  const runway     = burnRate > 0 ? Math.floor(cashOnHand / burnRate) : null
+  const totalIncome = plData.reduce((s, p) => s + p.income, 0)
+
+  // Bar chart data: revenue vs expense per division
+  const barChartData = plData
+    .filter(p => p.entity.type === 'DIVISION')
+    .map(p => ({
+      name: p.entity.name,
+      Revenue: p.income,
+      Expense: p.expense,
+      _color: getEntityAccentColor(p.entity),
+    }))
+    .sort((a, b) => b.Revenue - a.Revenue)
+
+  // Donut chart data: revenue % contribution per division
+  const donutData = plData
+    .filter(p => p.entity.type === 'DIVISION' && p.income > 0)
+    .map(p => ({
+      name: p.entity.name,
+      value: p.income,
+      color: getEntityAccentColor(p.entity),
+    }))
+    .sort((a, b) => b.value - a.value)
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-6 h-6 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin"
+          style={{ borderColor: 'var(--gold)', borderTopColor: 'transparent' }} />
       </div>
     )
   }
@@ -128,62 +193,69 @@ export function CEOCommandCenter() {
   return (
     <motion.div
       initial="hidden" animate="show"
-      variants={{ show: { transition: { staggerChildren: 0.07 } } }}
-      className="p-4 md:p-6 lg:p-8 space-y-6"
+      variants={{ show: { transition: { staggerChildren: 0.06 } } }}
+      className="p-4 md:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto"
     >
-      {/* ── Header ─────────────────────────────────────────────────────── */}
+      {/* ── Header ── */}
       <motion.div variants={FADE_UP} className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <p className="text-[#D4AF37] text-xs uppercase tracking-[0.35em] font-bold mb-1">Global Command Center</p>
-          <h1 className="text-[--color-text-primary] text-2xl md:text-3xl font-black tracking-tight">
-            Halo, CEO <span className="text-[#D4AF37]">{firstName}</span>
-          </h1>
-          <p className="text-[--color-text-muted] text-sm mt-1">
-            Ekosistem Vision Velocity Ventures · Real-time overview
+          <p className="text-xs uppercase tracking-[0.35em] font-bold mb-1" style={{ color: 'var(--gold)' }}>
+            Global Command Center
           </p>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <Link href="/invoicing/create"
-            className="flex items-center gap-2 bg-[#D4AF37] text-[#050505] text-xs font-bold px-3 py-2 rounded-md hover:bg-[#F5D678] transition-colors">
-            <Plus className="w-3.5 h-3.5" /> Invoice
-          </Link>
-          <Link href="/workspace/create"
-            className="flex items-center gap-2 border border-white/10 text-[--color-text-secondary] text-xs font-bold px-3 py-2 rounded-md hover:text-[--color-text-primary] hover:bg-white/5 transition-colors">
-            <Plus className="w-3.5 h-3.5" /> Log
-          </Link>
+          <h1 className="text-2xl md:text-3xl font-black tracking-tight" style={{ color: 'var(--text-primary)' }}>
+            Halo, CEO <span style={{ color: 'var(--gold)' }}>{firstName}</span>
+          </h1>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
+            Ekosistem Anugerah Ventures · Real-time overview
+          </p>
         </div>
       </motion.div>
 
-      {/* ── KPI Bento Grid ──────────────────────────────────────────────── */}
-      <motion.div variants={FADE_UP} className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+      {/* ── 6 KPI Cards ── */}
+      <motion.div variants={FADE_UP} className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
         <BentoKPI
           label="Cash on Hand"
           value={formatRupiah(cashOnHand)}
-          sub="Total Liquid Asset"
+          sub="Total liquid asset"
           icon={<Wallet className="w-4 h-4" />}
           color={cashOnHand >= 0 ? '#10b981' : '#ef4444'}
         />
         <BentoKPI
-          label="Burn Rate / Bulan"
+          label="Revenue MTD"
+          value={formatRupiah(totalRevenueMTD)}
+          sub={`Bulan ${new Date().toLocaleString('id-ID', { month: 'long' })}`}
+          icon={<TrendingUp className="w-4 h-4" />}
+          color="#D4AF37"
+        />
+        <BentoKPI
+          label="Burn Rate"
           value={formatRupiah(burnRate)}
-          sub="Rata-rata pengeluaran"
+          sub="Rata-rata pengeluaran/bln"
           icon={<TrendingDown className="w-4 h-4" />}
           color="#f97316"
+        />
+        <BentoKPI
+          label="Runway"
+          value={runway !== null ? `${runway} bln` : 'N/A'}
+          sub={runway !== null
+            ? runway >= 6 ? 'Aman ✓' : runway >= 3 ? 'Perlu perhatian' : '⚠️ Kritis'
+            : 'Tidak ada data'}
+          icon={<Clock className="w-4 h-4" />}
+          color={runway === null ? '#737373' : runway >= 6 ? '#10b981' : runway >= 3 ? '#f97316' : '#ef4444'}
         />
         <BentoKPI
           label="Invoice Pending"
           value={String(pendingInvoices)}
           sub={pendingInvoices > 0 ? 'Butuh persetujuan' : 'Semua bersih ✓'}
           icon={<FileText className="w-4 h-4" />}
-          color="#D4AF37"
+          color="#6366f1"
           href="/invoicing"
+          pulse={pendingInvoices > 0}
         />
         <BentoKPI
-          label="Log Belum Direview"
+          label="Log Pending"
           value={String(unreadLogs)}
-          sub={unreadLogs > 0 ? 'Dari divisi' : 'Semua telah direview ✓'}
+          sub={unreadLogs > 0 ? 'Dari divisi' : 'Semua bersih ✓'}
           icon={<FolderKanban className="w-4 h-4" />}
           color="#a855f7"
           href="/workspace"
@@ -191,78 +263,195 @@ export function CEOCommandCenter() {
         />
       </motion.div>
 
-      {/* ── Revenue vs Expense Chart ─────────────────────────────────────── */}
-      {chartData.length > 0 && (
-        <motion.div variants={FADE_UP} className="glass-card p-5 md:p-6 border border-white/5">
-          <h2 className="text-[--color-text-primary] font-bold mb-1">Net Cashflow per Divisi</h2>
-          <p className="text-[--color-text-muted] text-xs mb-6">Grafik profitabilitas bulanan · positif = profit, negatif = rugi</p>
-          <div className="h-[260px] md:h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData} margin={{ top: 5, right: 10, left: 5, bottom: 5 }}>
-                <XAxis dataKey="month" tick={{ fill: '#737373', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#737373', fontSize: 11 }} axisLine={false} tickLine={false}
-                  tickFormatter={(v) => `${(v / 1_000_000).toFixed(0)}jt`} />
-                <Tooltip
-                  contentStyle={{ background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, color: '#ededed' }}
-                  formatter={(v: any) => formatRupiah(Number(v))}
-                />
-                <Legend wrapperStyle={{ fontSize: 11, color: '#737373' }} />
-                {divisionEntities.map((e) => (
-                  <Line
-                    key={e.id}
-                    type="monotone"
-                    dataKey={e.name}
-                    stroke={getEntityAccentColor(e)}
-                    strokeWidth={2}
-                    dot={{ r: 3, fill: getEntityAccentColor(e) }}
-                    activeDot={{ r: 5 }}
+      {/* ── Chart Row: Line + Donut ── */}
+      <motion.div variants={FADE_UP} className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Line Chart — Net Cashflow */}
+        <div className="lg:col-span-2 glass-card p-5">
+          <h2 className="font-bold mb-0.5 text-sm" style={{ color: 'var(--text-primary)' }}>
+            Net Cashflow per Divisi
+          </h2>
+          <p className="text-xs mb-5" style={{ color: 'var(--text-muted)' }}>
+            Profitabilitas bulanan · positif = profit
+          </p>
+          {chartData.length > 0 ? (
+            <div className="h-[220px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                  <XAxis dataKey="month" tick={{ fill: 'var(--text-muted)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 10 }} axisLine={false} tickLine={false}
+                    tickFormatter={(v) => `${(v / 1_000_000).toFixed(0)}jt`} width={36} />
+                  <Tooltip
+                    contentStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 8, color: 'var(--text-primary)', fontSize: 12 }}
+                    formatter={(v: any) => formatRupiah(Number(v))}
                   />
+                  <Legend wrapperStyle={{ fontSize: 10, color: 'var(--text-muted)', paddingTop: 12 }} />
+                  {divisionEntities.map(e => (
+                    <Line key={e.id} type="monotone" dataKey={e.name}
+                      stroke={getEntityAccentColor(e)} strokeWidth={2}
+                      dot={{ r: 3, fill: getEntityAccentColor(e) }} activeDot={{ r: 5 }} />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-[220px] flex items-center justify-center">
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Belum ada data cashflow.</p>
+            </div>
+          )}
+        </div>
+
+        {/* Donut Chart — Revenue Contribution */}
+        <div className="glass-card p-5 flex flex-col">
+          <h2 className="font-bold mb-0.5 text-sm" style={{ color: 'var(--text-primary)' }}>
+            Kontribusi Revenue
+          </h2>
+          <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
+            % per divisi · Total {formatRupiah(totalIncome)}
+          </p>
+          {donutData.length > 0 ? (
+            <div className="flex-1 flex flex-col items-center">
+              <div className="w-full h-[180px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={donutData}
+                      cx="50%" cy="50%"
+                      innerRadius={52} outerRadius={72}
+                      dataKey="value"
+                      activeIndex={activePieIndex}
+                      activeShape={renderActiveShape}
+                      onMouseEnter={(_, index) => setActivePieIndex(index)}
+                    >
+                      {donutData.map((entry, i) => (
+                        <Cell key={i} fill={entry.color} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              {/* Legend */}
+              <div className="w-full space-y-1.5 mt-2">
+                {donutData.map((d, i) => (
+                  <button key={i} className="w-full flex items-center justify-between gap-2 text-xs"
+                    onMouseEnter={() => setActivePieIndex(i)}>
+                    <div className="flex items-center gap-1.5 overflow-hidden">
+                      <div className="w-2 h-2 rounded-full shrink-0" style={{ background: d.color }} />
+                      <span className="truncate font-medium" style={{ color: 'var(--text-secondary)' }}>{d.name}</span>
+                    </div>
+                    <span className="font-bold shrink-0" style={{ color: d.color }}>
+                      {totalIncome > 0 ? ((d.value / totalIncome) * 100).toFixed(1) : 0}%
+                    </span>
+                  </button>
                 ))}
-              </LineChart>
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 flex items-center justify-center">
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Belum ada data revenue.</p>
+            </div>
+          )}
+        </div>
+      </motion.div>
+
+      {/* ── Bar Chart: Revenue vs Expense per Division ── */}
+      {barChartData.length > 0 && (
+        <motion.div variants={FADE_UP} className="glass-card p-5 md:p-6">
+          <h2 className="font-bold mb-0.5 text-sm" style={{ color: 'var(--text-primary)' }}>
+            Revenue vs Expense per Divisi
+          </h2>
+          <p className="text-xs mb-6" style={{ color: 'var(--text-muted)' }}>
+            Perbandingan pemasukan dan pengeluaran kumulatif · semua waktu
+          </p>
+          <div className="h-[220px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={barChartData} barSize={20} barCategoryGap="35%"
+                margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                <XAxis dataKey="name" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 10 }} axisLine={false} tickLine={false}
+                  tickFormatter={(v) => `${(v / 1_000_000).toFixed(0)}jt`} width={36} />
+                <Tooltip
+                  contentStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 8, color: 'var(--text-primary)', fontSize: 12 }}
+                  formatter={(v: any, name: string) => [formatRupiah(Number(v)), name]}
+                />
+                <Legend wrapperStyle={{ fontSize: 11, color: 'var(--text-muted)' }} />
+                <Bar dataKey="Revenue" name="Revenue" radius={[4, 4, 0, 0]} fill="#10b981" fillOpacity={0.85} />
+                <Bar dataKey="Expense" name="Expense" radius={[4, 4, 0, 0]} fill="#ef4444" fillOpacity={0.75} />
+              </BarChart>
             </ResponsiveContainer>
           </div>
         </motion.div>
       )}
 
-      {/* ── Division Command Cards (Impersonation Panel) ─────────────────── */}
+      {/* ── Jaringan Entitas (Impersonate Panel) ── */}
       <motion.div variants={FADE_UP}>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-[--color-text-primary] font-bold text-sm">Masuk ke Divisi</h2>
-          <p className="text-[--color-text-muted] text-xs">Klik untuk menyamar sebagai Head</p>
+        <div className="flex items-center justify-between mb-4 pb-3" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+          <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--text-primary)' }}>Jaringan Entitas</h2>
+          <p className="text-[10px] uppercase tracking-widest hidden sm:block" style={{ color: 'var(--text-muted)' }}>
+            Klik untuk masuk sebagai Head
+          </p>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
-          {divisionEntities.map((entity) => {
-            const color = getEntityAccentColor(entity)
-            const config = getDivisionConfig(entity.name)
-            const pl = plData.find(d => d.entity.id === entity.id)
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+          {divisionEntities.map((div) => {
+            const isTarget = effectiveEntityId === div.id
+            const meta     = getDivisionMetadata(div.name)
+            const logoSrc  = div.logo_key ? `/api/storage/file?key=${div.logo_key}` : meta.logo
+            const color    = getEntityAccentColor(div)
+            const pl       = plData.find(d => d.entity.id === div.id)
+
             return (
-              <motion.button
-                key={entity.id}
-                whileHover={{ scale: 1.02, y: -2 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => impersonate(entity.id)}
-                className="glass-card p-4 text-left group cursor-pointer transition-all hover:border-opacity-60 bg-[#050505]/50"
-                style={{ borderColor: `${color}30` }}
+              <button
+                key={div.id}
+                onClick={() => isTarget ? impersonate(null) : impersonate(div.id)}
+                className="group relative text-left rounded-sm border transition-all duration-300 overflow-hidden"
+                style={{
+                  aspectRatio: '4/5',
+                  background: isTarget ? `${color}18` : 'var(--bg-elevated)',
+                  borderColor: isTarget ? color : 'var(--border-subtle)',
+                  boxShadow: isTarget ? `0 0 24px ${color}25` : 'none',
+                }}
               >
-                <div className="flex items-start justify-between mb-3">
-                  <span className="text-2xl">{config.emoji}</span>
-                  <Eye className="w-3.5 h-3.5 text-[--color-text-muted] group-hover:opacity-100 opacity-0 transition-opacity"
-                    style={{ color }} />
-                </div>
-                <p className="text-[--color-text-primary] font-bold text-sm mb-0.5">{entity.name}</p>
-                <p className="text-[--color-text-muted] text-[10px] mb-3">{config.description}</p>
-                {pl && (
-                  <div className="space-y-1 border-t pt-2" style={{ borderColor: `${color}20` }}>
-                    <div className="flex justify-between text-[10px]">
-                      <span className="text-[--color-text-muted]">Net Profit</span>
-                      <span className="font-bold" style={{ color: pl.net >= 0 ? '#10b981' : '#ef4444' }}>
-                        {formatRupiah(pl.net)}
-                      </span>
-                    </div>
+                {/* Logo as large background — top-right */}
+                {logoSrc && (
+                  <div className="absolute inset-0 flex items-start justify-end p-3 pointer-events-none">
+                    <img src={logoSrc} alt=""
+                      className="w-3/4 h-3/4 object-contain transition-all duration-500"
+                      style={{ opacity: isTarget ? 0.28 : 0.1, filter: 'contrast(1.2)' }}
+                    />
                   </div>
                 )}
-                <div className="mt-2 h-0.5 w-full rounded-full opacity-30" style={{ background: color }} />
-              </motion.button>
+                {!logoSrc && (
+                  <div className="absolute top-2 right-2 text-5xl font-black pointer-events-none"
+                    style={{ color, opacity: 0.12 }}>
+                    {div.name.charAt(0)}
+                  </div>
+                )}
+
+                {isTarget && (
+                  <div className="absolute top-3 left-3">
+                    <CheckCircle2 className="w-4 h-4" style={{ color }} />
+                  </div>
+                )}
+
+                {/* Bottom-left content */}
+                <div className="absolute bottom-0 left-0 right-0 p-3">
+                  <p className="text-[9px] font-bold uppercase tracking-wider leading-relaxed"
+                    style={{ color: isTarget ? color : 'var(--text-muted)' }}>
+                    {meta.desc}
+                  </p>
+                  {pl && (
+                    <p className="text-xs font-black tabular-nums mt-1"
+                      style={{ color: pl.net >= 0 ? '#10b981' : '#ef4444' }}>
+                      {formatRupiah(pl.net)}
+                    </p>
+                  )}
+                </div>
+
+                {/* Bottom accent bar */}
+                <div className="absolute bottom-0 left-0 h-0.5 transition-all duration-300"
+                  style={{ width: isTarget ? '100%' : '0%', background: color }} />
+                <div className="absolute bottom-0 left-0 h-0.5 w-0 group-hover:w-1/3 transition-all duration-300"
+                  style={{ background: color, opacity: isTarget ? 0 : 0.5 }} />
+              </button>
             )
           })}
         </div>
@@ -271,25 +460,24 @@ export function CEOCommandCenter() {
   )
 }
 
-// ─── Bento KPI Card ──────────────────────────────────────────────────────────
+// ── BentoKPI Component ─────────────────────────────────────────────────────
 function BentoKPI({ label, value, sub, icon, color, href, pulse }: {
   label: string; value: string; sub: string
   icon: React.ReactNode; color: string; href?: string; pulse?: boolean
 }) {
-  const Wrapper = href ? Link : 'div'
+  const Wrapper = (href ? Link : 'div') as any
   return (
-    <Wrapper href={href ?? '#'} className={`glass-card p-4 md:p-5 flex flex-col gap-3 group transition-all hover:scale-[1.01] bg-[#050505]/50 ${pulse ? 'animate-pulse hover:animate-none' : ''}`}
-      style={{ borderColor: `${color}25` }}>
+    <Wrapper
+      href={href ?? '#'}
+      className={`glass-card p-4 flex flex-col gap-2.5 transition-all hover:scale-[1.01] ${pulse ? 'animate-pulse hover:animate-none' : ''}`}
+      style={{ borderLeftColor: color, borderLeftWidth: '2px' }}
+    >
       <div className="flex items-center justify-between">
-        <p className="text-[--color-text-muted] text-xs uppercase tracking-wider">{label}</p>
-        <div className="p-1.5 rounded-md" style={{ background: `${color}15`, color }}>
-          {icon}
-        </div>
+        <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{label}</p>
+        <div className="p-1.5 rounded" style={{ background: `${color}15`, color }}>{icon}</div>
       </div>
-      <div>
-        <p className="text-xl md:text-2xl font-black tabular-nums" style={{ color }}>{value}</p>
-        <p className="text-[--color-text-muted] text-xs mt-0.5">{sub}</p>
-      </div>
+      <p className="text-xl font-black tabular-nums leading-none" style={{ color }}>{value}</p>
+      <p className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{sub}</p>
     </Wrapper>
   )
 }
