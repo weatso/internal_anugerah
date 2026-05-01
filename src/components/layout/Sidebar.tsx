@@ -5,23 +5,22 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import {
-  LayoutDashboard, TrendingUp, FileText, FolderKanban,
-  Settings, ArrowLeftRight, Briefcase, ShieldCheck, X, LogOut
+  LayoutDashboard, TrendingUp, FileText,
+  Settings, Briefcase, ShieldCheck, X, LogOut
 } from 'lucide-react'
 import { useUser } from '@/components/providers/UserProvider'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
 
+// MENU DIRAMPINGKAN: Hanya modul yang siap produksi (Finance, Invoicing, CRM, Admin, Settings)
 const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['CEO', 'FINANCE', 'HEAD', 'STAFF', 'DESIGN'] },
-  { href: '/finance', label: 'Finance', icon: TrendingUp, roles: ['CEO', 'FINANCE', 'HEAD'] },
-  { href: '/invoicing', label: 'Invoicing', icon: FileText, roles: ['CEO', 'FINANCE', 'HEAD'] },
-  { href: '/workspace', label: 'Workspace', icon: FolderKanban, roles: ['CEO', 'FINANCE', 'HEAD', 'STAFF', 'DESIGN'] },
-  { href: '/clients', label: 'CRM / Clients', icon: Briefcase, roles: ['CEO', 'FINANCE', 'HEAD', 'STAFF'] },
-  { href: '/sales-kit', label: 'Sales Kit', icon: Briefcase, roles: ['CEO', 'HEAD', 'DESIGN'] },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['CEO','FINANCE','HEAD','STAFF','DESIGN'] },
+  { href: '/finance', label: 'Finance', icon: TrendingUp, roles: ['CEO','FINANCE','HEAD'] },
+  { href: '/invoicing', label: 'Invoicing', icon: FileText, roles: ['CEO','FINANCE','HEAD'] },
+  { href: '/clients', label: 'CRM / Clients', icon: Briefcase, roles: ['CEO','FINANCE','HEAD','STAFF'] },
   { href: '/admin', label: 'Admin Panel', icon: ShieldCheck, roles: ['CEO'] },
-  { href: '/settings', label: 'Settings', icon: Settings, roles: ['CEO', 'FINANCE', 'HEAD', 'STAFF', 'DESIGN'] },
+  { href: '/settings', label: 'Settings', icon: Settings, roles: ['CEO','FINANCE','HEAD','STAFF','DESIGN'] },
 ]
 
 interface SidebarProps {
@@ -34,22 +33,19 @@ export function Sidebar({ onClose }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
-
+  
   const { profile, highestRole, loading, effectiveEntity } = useUser()
 
   const currentRole = highestRole ?? 'STAFF'
   const visibleNav = NAV_ITEMS.filter(item => item.roles.includes(currentRole))
 
-  // Di dalam Sidebar.tsx
   const handleSignOut = async () => {
     try {
-      // Cukup panggil signOut. 
-      // UserProvider.tsx akan mendeteksi perubahan sesi dan melempar user ke /login secara otomatis.
-      await supabase.auth.signOut();
+      await supabase.auth.signOut()
     } catch (error) {
-      console.error("Gagal keluar:", error);
+      console.error("Gagal keluar:", error)
     }
-  };
+  }
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -58,7 +54,7 @@ export function Sidebar({ onClose }: SidebarProps) {
       setWidth(newWidth)
     }
     const handleMouseUp = () => setIsResizing(false)
-
+    
     if (isResizing) {
       document.addEventListener('mousemove', handleMouseMove)
       document.addEventListener('mouseup', handleMouseUp)
@@ -75,13 +71,11 @@ export function Sidebar({ onClose }: SidebarProps) {
       transition={{ duration: isResizing ? 0 : 0.2, ease: "linear" }}
       className="relative flex flex-col h-screen bg-[#050505] border-r border-white/5 z-30 shrink-0"
     >
-      {/* Resizer Handle */}
       <div
-        className="absolute right-0 top-0 w-1.5 h-full cursor-col-resize z-40 hover:bg-[#C5A028] transition-colors"
+        className="absolute right-0 top-0 w-1.5 h-full cursor-col-resize z-40 hover:bg-[#D4AF37] transition-colors"
         onMouseDown={(e) => { e.preventDefault(); setIsResizing(true) }}
       />
 
-      {/* Brand Header */}
       <div className="p-6 border-b border-white/5 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="relative w-8 h-8 shrink-0">
@@ -89,7 +83,7 @@ export function Sidebar({ onClose }: SidebarProps) {
           </div>
           <div className="overflow-hidden whitespace-nowrap">
             <p className="text-white font-black text-sm tracking-tighter uppercase">ANUGERAH</p>
-            <p className="text-[#C5A028] text-[9px] tracking-[0.3em] font-bold uppercase">VENTURES OS</p>
+            <p className="text-[#D4AF37] text-[9px] tracking-[0.3em] font-bold uppercase">VENTURES OS</p>
           </div>
         </div>
         <button onClick={onClose} className="lg:hidden text-gray-500 hover:text-white">
@@ -97,7 +91,6 @@ export function Sidebar({ onClose }: SidebarProps) {
         </button>
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 py-6 px-3 space-y-1 overflow-y-auto">
         {visibleNav.map((item) => {
           const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))
@@ -108,7 +101,7 @@ export function Sidebar({ onClose }: SidebarProps) {
               href={item.href}
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm font-medium transition-all group overflow-hidden whitespace-nowrap",
-                isActive ? "bg-[#C5A028]/10 text-[#C5A028] border-l-2 border-[#C5A028]" : "text-gray-500 hover:text-white hover:bg-white/5 border-l-2 border-transparent"
+                isActive ? "bg-[#D4AF37]/10 text-[#D4AF37] border-l-2 border-[#D4AF37]" : "text-gray-500 hover:text-white hover:bg-white/5 border-l-2 border-transparent"
               )}
             >
               <Icon className="w-4 h-4 shrink-0" />
@@ -118,21 +111,20 @@ export function Sidebar({ onClose }: SidebarProps) {
         })}
       </nav>
 
-      {/* Profile & Logout Footer */}
       {!loading && profile && (
         <div className="mt-auto p-4 border-t border-white/5 bg-gradient-to-t from-white/[0.02] to-transparent">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 overflow-hidden">
               {(profile as any).avatar_url ? (
-                <div className="w-9 h-9 rounded-full shrink-0 relative overflow-hidden border border-[#C5A028]/30">
-                  <img
-                    src={(profile as any).avatar_url.startsWith('http') ? (profile as any).avatar_url : `/api/storage/file?key=${encodeURIComponent((profile as any).avatar_url)}`}
-                    alt="Profile"
-                    className="w-full h-full object-cover"
+                <div className="w-9 h-9 rounded-full shrink-0 relative overflow-hidden border border-[#D4AF37]/30">
+                  <img 
+                    src={(profile as any).avatar_url.startsWith('http') ? (profile as any).avatar_url : `/api/storage/file?key=${encodeURIComponent((profile as any).avatar_url)}`} 
+                    alt="Profile" 
+                    className="w-full h-full object-cover" 
                   />
                 </div>
               ) : (
-                <div className="w-9 h-9 rounded-full bg-[#C5A028] flex items-center justify-center font-bold text-black shrink-0 text-xs">
+                <div className="w-9 h-9 rounded-full bg-[#D4AF37] flex items-center justify-center font-bold text-black shrink-0 text-xs">
                   {profile.full_name?.charAt(0) || 'U'}
                 </div>
               )}
@@ -143,9 +135,8 @@ export function Sidebar({ onClose }: SidebarProps) {
                 </p>
               </div>
             </div>
-
-            {/* TOMBOL LOGOUT */}
-            <button
+            
+            <button 
               onClick={handleSignOut}
               className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded-sm transition-all"
               title="Keluar"
