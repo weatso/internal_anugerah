@@ -22,7 +22,7 @@ const INDUSTRY_OPTIONS = [
 ]
 
 export default function CRMMasterPage() {
-  const { profile, effectiveEntity } = useUser()
+  const { profile, effectiveEntity, highestRole } = useUser()
   const supabase = createClient()
 
   const [clients, setClients] = useState<any[]>([])
@@ -75,7 +75,7 @@ export default function CRMMasterPage() {
   }
 
   async function toggleBlacklist(clientId: string, currentStatus: boolean) {
-    if (profile?.role !== 'CEO') return alert('Hanya CEO yang dapat mengubah status Blacklist.')
+    if (highestRole !== 'CEO') return alert('Hanya CEO yang dapat mengubah status Blacklist.')
 
     await supabase.from('clients').update({ is_blacklisted: !currentStatus }).eq('id', clientId)
     fetchClients()

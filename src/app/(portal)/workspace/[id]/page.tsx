@@ -12,7 +12,7 @@ import type { WorkspaceLog } from '@/types'
 
 export default function LogDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const { profile } = useUser()
+  const { profile, highestRole } = useUser()
   const supabase = createClient()
   const router = useRouter()
   const [log, setLog] = useState<WorkspaceLog | null>(null)
@@ -58,7 +58,7 @@ export default function LogDetailPage() {
   if (loading) return <div className="flex justify-center items-center h-full"><Loader2 className="w-5 h-5 animate-spin text-[#D4AF37]" /></div>
   if (!log) return <div className="p-8 text-[--color-text-muted]">Log tidak ditemukan.</div>
 
-  const isCeo = profile?.role === 'CEO'
+  const isCeo = highestRole === 'CEO'
   const statusIcons: Record<string, React.ReactNode> = {
     SUBMITTED: <Clock className="w-4 h-4" />,
     REVIEWED_BY_CEO: <CheckCheck className="w-4 h-4" />,

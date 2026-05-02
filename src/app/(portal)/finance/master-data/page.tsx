@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 
 export default function MasterDataPage() {
-  const { profile, loading: userLoading } = useUser()
+  const { profile, loading: userLoading, highestRole } = useUser()
   const router = useRouter()
   const supabase = createClient()
 
@@ -25,13 +25,13 @@ export default function MasterDataPage() {
 
   // Fetch Data
   useEffect(() => {
-    if (!userLoading && profile?.role !== 'CEO') {
+    if (!userLoading && highestRole !== 'CEO') {
       toast.error('Akses ditolak.')
       router.push('/finance')
       return
     }
 
-    if (profile?.role === 'CEO') {
+    if (highestRole === 'CEO') {
       fetchMasterData()
     }
   }, [profile, userLoading, router])
@@ -116,7 +116,7 @@ export default function MasterDataPage() {
     setLoading(false)
   }
 
-  if (userLoading || profile?.role !== 'CEO') {
+  if (userLoading || highestRole !== 'CEO') {
     return <div className="flex items-center justify-center min-h-[60vh]"><Loader2 className="w-8 h-8 text-[#D4AF37] animate-spin" /></div>
   }
 

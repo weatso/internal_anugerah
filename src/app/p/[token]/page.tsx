@@ -10,13 +10,14 @@ const admin = () => createClient(
   { auth: { autoRefreshToken: false, persistSession: false } }
 )
 
-export default async function ClientPortalPage({ params }: { params: { token: string } }) {
+export default async function ClientPortalPage({ params }: { params: Promise<{ token: string }> }) {
+  const { token } = await params
   const db = admin()
 
   const { data: project } = await db
     .from('projects')
     .select('*, client:clients(*), invoice:commercial_documents(*, entities(name, primary_color, logo_key))')
-    .eq('magic_link_token', params.token)
+    .eq('magic_link_token', token)
     .single()
 
   if (!project) {
@@ -123,7 +124,7 @@ export default async function ClientPortalPage({ params }: { params: { token: st
         {invoice && (
           <div className="rounded-xl p-5 border" style={{ background: `${accentColor}08`, borderColor: `${accentColor}25` }}>
             <h2 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: accentColor }}>Dokumen</h2>
-            <a href={`/api/generate-pdf?id=${invoice.id}&token=${params.token}`} target="_blank"
+            <a href={`/api/generate-pdf?id=${invoice.id}&token=${token}`} target="_blank"
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-all"
               style={{ background: accentColor, color: '#050505' }}>
               <FileText className="w-4 h-4" />

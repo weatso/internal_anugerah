@@ -9,7 +9,7 @@ import type { ChartOfAccount, JournalEntry } from '@/types'
 import { toast } from 'sonner'
 
 export default function TransactionsPage() {
-  const { profile } = useUser()
+  const { profile, highestRole } = useUser()
   const supabase = createClient()
   
   // Data
@@ -51,7 +51,7 @@ export default function TransactionsPage() {
       .order('created_at', { ascending: false })
       
     // Apply entity filter (Only see own division unless CEO/FINANCE)
-    if (profile?.role !== 'CEO' && profile?.role !== 'FINANCE') {
+    if (highestRole !== 'CEO' && highestRole !== 'FINANCE') {
       q = q.eq('entity_id', profile?.entity_id)
     }
 
@@ -75,7 +75,7 @@ export default function TransactionsPage() {
         const formData = new FormData()
         formData.append('file', proofFile)
         formData.append('folder', 'receipts')
-        formData.append('entity_id', profile.entity_id)
+        formData.append('entity_id', profile.entity_id ?? 'general')
         const res = await fetch('/api/storage/upload', { method: 'POST', body: formData })
         if (!res.ok) throw new Error('Gagal mengupload struk')
         const json = await res.json()

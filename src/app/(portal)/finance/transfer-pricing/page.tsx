@@ -9,7 +9,7 @@ import type { Entity, InternalBilling, ChartOfAccount } from '@/types'
 import { toast } from 'sonner'
 
 export default function TransferPricingPage() {
-  const { profile } = useUser()
+  const { profile, highestRole } = useUser()
   const supabase = createClient()
   
   const [billings, setBillings] = useState<InternalBilling[]>([])
@@ -37,9 +37,9 @@ export default function TransferPricingPage() {
     
     // Filter billings based on role
     let filteredBillings = (b || []) as InternalBilling[]
-    if (profile?.role === 'HEAD') {
-      filteredBillings = filteredBillings.filter(x => x.to_entity_id === profile.entity_id || x.from_entity_id === profile.entity_id)
-    } else if (profile?.role !== 'CEO' && profile?.role !== 'FINANCE') {
+    if (highestRole === 'HEAD') {
+      filteredBillings = filteredBillings.filter(x => x.to_entity_id === profile?.entity_id || x.from_entity_id === profile?.entity_id)
+    } else if (highestRole !== 'CEO' && highestRole !== 'FINANCE') {
       filteredBillings = []
     }
 
@@ -61,7 +61,7 @@ export default function TransferPricingPage() {
 
   // Init form defaults
   useEffect(() => {
-    if (profile?.role === 'HEAD') {
+    if (highestRole === 'HEAD' && profile?.entity_id) {
       setFormFromEntity(profile.entity_id)
     }
   }, [profile])
@@ -126,7 +126,8 @@ export default function TransferPricingPage() {
     }
   }
 
-  const isCeoOrFinance = profile?.role === 'CEO' || profile?.role === 'FINANCE'
+  const isCeoOrFinance = highestRole === 'CEO' || highestRole === 'FINANCE'
+  const isCeo = highestRole === 'CEO'
 
   return (
     <div className="p-6 md:p-8 space-y-6 animate-[slide-up_0.4s_ease]">
@@ -136,7 +137,7 @@ export default function TransferPricingPage() {
           <h1 className="text-[--color-text-primary] text-2xl font-black tracking-tight">Transfer Pricing</h1>
           <p className="text-[--color-text-muted] text-sm mt-1">Alokasi biaya virtual antar-divisi (Internal Billing).</p>
         </div>
-        {isCeoOrFinance && (
+        {isCeo && (
           <button onClick={() => setShowForm(true)}
             className="flex items-center gap-2 bg-[#D4AF37] text-[--color-bg-primary] font-bold px-4 py-2 rounded-md text-sm hover:bg-[#F5D678] transition-all uppercase tracking-widest shadow-lg shadow-[#D4AF37]/10">
             <Plus className="w-4 h-4" /> Tagih Divisi
@@ -172,7 +173,7 @@ export default function TransferPricingPage() {
                     {b.status.replace('_', ' ')}
                   </span>
                   
-                  {b.status === 'PENDING_APPROVAL' && (profile?.role === 'CEO' || (profile?.role === 'HEAD' && profile?.entity_id === b.to_entity_id)) && (
+                  {b.status === 'PENDING_APPROVAL' && (highestRole === 'CEO' || (highestRole === 'HEAD' && profile?.entity_id === b.to_entity_id)) && (
                     <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2 mt-2">
                       <select value={selectedExpenseCategory} onChange={e => setSelectedExpenseCategory(e.target.value)}
                         className="bg-black/50 border border-white/10 rounded-md px-3 py-2 text-[--color-text-primary] text-xs focus:border-[#D4AF37]/50 w-full lg:w-48">
@@ -213,7 +214,7 @@ export default function TransferPricingPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-[--color-text-muted] text-xs uppercase tracking-widest mb-1.5 block">Divisi Penagih (Yang Mengirim Bill)</label>
-                  <select required value={formFromEntity} onChange={e => setFormFromEntity(e.target.value)} disabled={profile?.role === 'HEAD'}
+                  <select required value={formFromEntity} onChange={e => setFormFromEntity(e.target.value)} disabled={highestRole === 'HEAD'}
                     className="w-full bg-black/50 border border-white/10 rounded-md px-3 py-2 text-[--color-text-primary] text-sm focus:border-[#D4AF37]/50 disabled:opacity-50">
                     <option value="">-- Pilih Penagih --</option>
                     {entities.map(en => <option key={en.id} value={en.id}>{en.name}</option>)}

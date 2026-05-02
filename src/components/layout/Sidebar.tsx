@@ -3,39 +3,49 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useTheme } from 'next-themes'
 import {
-  LayoutDashboard, TrendingUp, FileText,
-  Settings, Briefcase, ShieldCheck, X, LogOut,
-  Sun, Moon, FolderKanban
+  LayoutDashboard, TrendingUp, FileText, Settings, Briefcase,
+  ShieldCheck, X, LogOut, Sun, Moon, FolderKanban, ChevronDown,
+  Receipt, BookOpen, Package, ArrowLeftRight, Layers, DollarSign,
+  PieChart, BarChart3, Tag
 } from 'lucide-react'
 import { useUser } from '@/components/providers/UserProvider'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
 
-const NAV_ITEMS = [
-  { href: '/dashboard',                 label: 'Dashboard',         icon: LayoutDashboard, roles: ['CEO','FINANCE','HEAD','STAFF','DESIGN'] },
-  { href: '/finance',                   label: 'Finance',           icon: TrendingUp,      roles: ['CEO','FINANCE','HEAD'] },
-  { href: '/finance/amortization',      label: '↳ Amortisasi',      icon: TrendingUp,      roles: ['CEO','FINANCE'] },
-  { href: '/finance/commissions',       label: '↳ Komisi',          icon: TrendingUp,      roles: ['CEO','FINANCE'] },
-  { href: '/finance/dividends',         label: '↳ Dividen & Profit',icon: TrendingUp,      roles: ['CEO'] },
-  { href: '/invoicing',                 label: 'Invoicing',         icon: FileText,        roles: ['CEO','FINANCE','HEAD'] },
-  { href: '/workspace',                 label: 'Workspace',         icon: FolderKanban,    roles: ['CEO','FINANCE','HEAD','STAFF','DESIGN'] },
-  { href: '/clients',                   label: 'CRM / Clients',     icon: Briefcase,       roles: ['CEO','FINANCE','HEAD','STAFF'] },
-  { href: '/admin',                     label: 'Admin Panel',       icon: ShieldCheck,     roles: ['CEO'] },
-  { href: '/settings',                  label: 'Settings',          icon: Settings,        roles: ['CEO','FINANCE','HEAD','STAFF','DESIGN'] },
+const FINANCE_ITEMS = [
+  { href: '/finance/transactions',     label: 'Buku Besar',          icon: BookOpen,       roles: ['CEO','FINANCE','HEAD','STAFF'] },
+  { href: '/finance/master-data',      label: 'Master COA',          icon: Layers,         roles: ['CEO'] },
+  { href: '/finance/transfer-pricing', label: 'Transfer Pricing',    icon: ArrowLeftRight, roles: ['CEO','FINANCE'] },
+  { href: '/finance/amortization',     label: 'Amortisasi Revenue',  icon: Layers,         roles: ['CEO','FINANCE'] },
+  { href: '/finance/commissions',      label: 'Komisi Sales',        icon: DollarSign,     roles: ['CEO','FINANCE'] },
+  { href: '/finance/dividends',        label: 'Profit Split & Dividen', icon: PieChart,    roles: ['CEO'] },
+  { href: '/finance/reports',          label: 'Laporan Keuangan',    icon: BarChart3,      roles: ['CEO','FINANCE'] },
 ]
 
-interface SidebarProps {
-  onClose?: () => void
-}
+const TOP_NAV = [
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['CEO','FINANCE','HEAD','STAFF','DESIGN'] },
+]
+
+const BOTTOM_NAV = [
+  { href: '/invoicing',   label: 'Komersial',           icon: Receipt,      roles: ['CEO','FINANCE','HEAD'] },
+  { href: '/catalogue',   label: 'Katalog & Portofolio', icon: Tag,         roles: ['CEO','FINANCE','HEAD','STAFF','DESIGN'] },
+  { href: '/workspace',   label: 'Workspace',           icon: FolderKanban, roles: ['CEO','FINANCE','HEAD','STAFF','DESIGN'] },
+  { href: '/clients',     label: 'CRM / Klien',         icon: Briefcase,    roles: ['CEO','FINANCE','HEAD','STAFF'] },
+  { href: '/admin',       label: 'Admin Panel',         icon: ShieldCheck,  roles: ['CEO'] },
+  { href: '/settings',    label: 'Settings',            icon: Settings,     roles: ['CEO','FINANCE','HEAD','STAFF','DESIGN'] },
+]
+
+interface SidebarProps { onClose?: () => void }
 
 export function Sidebar({ onClose }: SidebarProps) {
   const [width, setWidth] = useState(260)
   const [isResizing, setIsResizing] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [financeOpen, setFinanceOpen] = useState(false)
 
   const pathname = usePathname()
   const supabase = createClient()
@@ -44,8 +54,12 @@ export function Sidebar({ onClose }: SidebarProps) {
 
   useEffect(() => setMounted(true), [])
 
+  // Auto-open finance accordion if on a finance page
+  useEffect(() => {
+    if (pathname.startsWith('/finance')) setFinanceOpen(true)
+  }, [pathname])
+
   const currentRole = highestRole ?? 'STAFF'
-  const visibleNav = NAV_ITEMS.filter(item => item.roles.includes(currentRole))
 
   const handleSignOut = async () => {
     try { await supabase.auth.signOut() }
@@ -68,6 +82,28 @@ export function Sidebar({ onClose }: SidebarProps) {
       document.removeEventListener('mouseup', handleMouseUp)
     }
   }, [isResizing])
+
+  const navLinkCls = (active: boolean) => cn(
+    'flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm font-medium transition-all overflow-hidden whitespace-nowrap border-l-2',
+    active ? 'border-l-[var(--gold)]' : 'border-l-transparent'
+  )
+  const navLinkStyle = (active: boolean) => active
+    ? { background: 'var(--gold-glow)', color: 'var(--gold)' }
+    : { color: 'var(--text-muted)' }
+
+  const NavLink = ({ href, label, icon: Icon }: { href: string; label: string; icon: any }) => {
+    const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
+    return (
+      <Link href={href} className={navLinkCls(isActive)} style={navLinkStyle(isActive)}>
+        <Icon className="w-4 h-4 shrink-0" />
+        <span>{label}</span>
+      </Link>
+    )
+  }
+
+  const visibleFinance = FINANCE_ITEMS.filter(i => i.roles.includes(currentRole))
+  const isFinanceActive = pathname.startsWith('/finance')
+  const isCatalogueActive = pathname.startsWith('/catalogue')
 
   return (
     <motion.aside
@@ -100,31 +136,77 @@ export function Sidebar({ onClose }: SidebarProps) {
 
       {/* Nav */}
       <nav className="flex-1 py-5 px-3 space-y-0.5 overflow-y-auto">
-        {visibleNav.map((item) => {
-          const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))
-          const Icon = item.icon
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm font-medium transition-all overflow-hidden whitespace-nowrap border-l-2',
-                isActive
-                  ? 'border-l-[var(--gold)]'
-                  : 'border-l-transparent'
+        {/* Dashboard */}
+        {TOP_NAV.filter(i => i.roles.includes(currentRole)).map(item => (
+          <NavLink key={item.href} {...item} />
+        ))}
+
+        {/* Finance Accordion */}
+        {visibleFinance.length > 0 && (
+          <div>
+            <div className="flex items-center">
+              <Link href="/finance"
+                className={cn(
+                  'flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm font-medium transition-all border-l-2 flex-1 overflow-hidden whitespace-nowrap',
+                  isFinanceActive ? 'border-l-[var(--gold)]' : 'border-l-transparent'
+                )}
+                style={isFinanceActive
+                  ? { background: 'var(--gold-glow)', color: 'var(--gold)' }
+                  : { color: 'var(--text-muted)' }
+                }
+              >
+                <TrendingUp className="w-4 h-4 shrink-0" />
+                <span className="flex-1 text-left overflow-hidden whitespace-nowrap">Finance & Akuntansi</span>
+              </Link>
+              <button
+                onClick={() => setFinanceOpen(p => !p)}
+                className={cn('p-2.5 rounded-sm transition-all', isFinanceActive ? '' : '')}
+                style={isFinanceActive ? { color: 'var(--gold)' } : { color: 'var(--text-muted)' }}
+              >
+                <motion.div animate={{ rotate: financeOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </motion.div>
+              </button>
+            </div>
+
+            <AnimatePresence initial={false}>
+              {financeOpen && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden ml-3 mt-0.5 pl-3 space-y-0.5"
+                  style={{ borderLeft: '1px solid var(--border-subtle)' }}
+                >
+                  {visibleFinance.map(item => {
+                    const isActive = pathname === item.href || (item.href !== '/finance' && pathname.startsWith(item.href))
+                    const Icon = item.icon
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className="flex items-center gap-2.5 px-2.5 py-2 rounded-sm text-xs font-medium transition-all whitespace-nowrap"
+                        style={isActive
+                          ? { background: 'var(--gold-glow)', color: 'var(--gold)' }
+                          : { color: 'var(--text-muted)' }
+                        }
+                      >
+                        <Icon className="w-3.5 h-3.5 shrink-0" />
+                        <span>{item.label}</span>
+                      </Link>
+                    )
+                  })}
+                </motion.div>
               )}
-              style={isActive
-                ? { background: 'var(--gold-glow)', color: 'var(--gold)' }
-                : { color: 'var(--text-muted)' }
-              }
-              onMouseEnter={e => { if (!isActive) { (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; (e.currentTarget as HTMLElement).style.background = 'var(--border-subtle)' } }}
-              onMouseLeave={e => { if (!isActive) { (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; (e.currentTarget as HTMLElement).style.background = 'transparent' } }}
-            >
-              <Icon className="w-4 h-4 shrink-0" />
-              <span>{item.label}</span>
-            </Link>
-          )
-        })}
+            </AnimatePresence>
+          </div>
+        )}
+
+        {/* Bottom Nav */}
+        {BOTTOM_NAV.filter(i => i.roles.includes(currentRole)).map(item => (
+          <NavLink key={item.href} {...item} />
+        ))}
       </nav>
 
       {/* Footer */}
@@ -154,27 +236,20 @@ export function Sidebar({ onClose }: SidebarProps) {
             </div>
 
             <div className="flex items-center gap-1 shrink-0">
-              {/* Theme Toggle */}
               {mounted && (
                 <button
                   onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                   className="p-1.5 rounded-sm transition-all"
                   style={{ color: 'var(--text-muted)' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--gold)'; (e.currentTarget as HTMLElement).style.background = 'var(--gold-glow)' }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; (e.currentTarget as HTMLElement).style.background = 'transparent' }}
-                  title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                  title={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
                 >
                   {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
                 </button>
               )}
-
-              {/* Sign Out */}
               <button
                 onClick={handleSignOut}
                 className="p-1.5 rounded-sm transition-all"
                 style={{ color: 'var(--text-muted)' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#ef4444'; (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.1)' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; (e.currentTarget as HTMLElement).style.background = 'transparent' }}
                 title="Keluar"
               >
                 <LogOut className="w-4 h-4" />

@@ -20,10 +20,13 @@ export async function POST(req: Request) {
     const { data: { session } } = await supabaseAuth.auth.getSession()
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { entity_id, period_month, bank_account_id } = await req.json()
+    const { data: profile } = await supabaseAuth.from('profiles').select('roles').eq('id', session.user.id).single()
+    if (!profile?.roles?.includes('CEO')) return NextResponse.json({ error: 'Forbidden: CEO only' }, { status: 403 })
+
+    const { entity_id, period_month, bank_account_id, distribution_type = 'DIVIDEND' } = await req.json()
     const db = admin()
 
-    // 1. Hitung Net Profit dari journal_lines bulan tersebut
+    // Hitung Net Profit
     const [year, month] = period_month.split('-').map(Number)
     const startDate = `${period_month}-01`
     const endDate = new Date(year, month, 0).toISOString().slice(0, 10)
@@ -33,38 +36,43 @@ export async function POST(req: Request) {
       .gte('transaction_date', startDate).lte('transaction_date', endDate)
 
     const journalIds = (journals || []).map((j: any) => j.id)
-    if (journalIds.length === 0)
-      return NextResponse.json({ error: 'Tidak ada transaksi di periode ini' }, { status: 400 })
+    if (journalIds.length === 0) return NextResponse.json({ error: 'Tidak ada transaksi di periode ini' }, { status: 400 })
 
     const { data: lines } = await db.from('journal_lines')
       .select('account_id, debit, credit, chart_of_accounts(account_class)')
       .in('journal_id', journalIds)
 
-    let totalRevenue = 0
-    let totalCost = 0
+    let totalRevenue = 0, totalCost = 0
     for (const line of (lines || []) as any[]) {
       const cls = line.chart_of_accounts?.account_class
       if (cls === 'REVENUE') totalRevenue += (Number(line.credit) - Number(line.debit))
       if (cls === 'COGS' || cls === 'EXPENSE') totalCost += (Number(line.debit) - Number(line.credit))
     }
     const netProfit = totalRevenue - totalCost
-    if (netProfit <= 0) throw new Error(`Net Profit tidak positif (${netProfit})`)
+    if (netProfit <= 0) throw new Error(`Net Profit tidak positif: ${netProfit}`)
 
-    // 2. Fetch stakeholders aktif + COA
-    const [{ data: stakeholders }, { data: coas }] = await Promise.all([
-      db.from('stakeholders').select('*').eq('is_active', true),
-      db.from('chart_of_accounts').select('id, account_code'),
-    ])
-    if (!stakeholders || stakeholders.length === 0) throw new Error('Tidak ada stakeholder aktif')
+    // Stakeholders berdasarkan payout_type
+    const { data: stakeholders } = await db.from('stakeholders')
+      .select('*').eq('is_active', true).eq('payout_type', distribution_type)
+    if (!stakeholders || stakeholders.length === 0)
+      throw new Error(`Tidak ada stakeholder dengan tipe ${distribution_type} yang aktif`)
+
+    // COA: tentukan akun Debit berdasarkan tipe
+    const { data: coas } = await db.from('chart_of_accounts').select('id, account_code')
     const coaMap = Object.fromEntries((coas || []).map((c: any) => [c.account_code, c.id]))
-    const retainedId = coaMap['3-3000']
-    if (!retainedId) throw new Error('Akun Retained Earnings (3-3000) tidak ditemukan')
 
-    // 3. Buat journal entry compound
+    // PROFIT_SPLIT → Debit: Biaya Bagi Hasil (5-5000)
+    // DIVIDEND     → Debit: Laba Ditahan (3-3000)
+    const debitAccountId = distribution_type === 'PROFIT_SPLIT'
+      ? coaMap['5-5000']
+      : coaMap['3-3000']
+    if (!debitAccountId) throw new Error(`Akun debit untuk ${distribution_type} tidak ditemukan di COA`)
+
+    // Buat Journal Entry
     const { data: journal, error: jErr } = await db.from('journal_entries').insert({
       transaction_date: new Date().toISOString().slice(0, 10),
-      reference_number: `JRN/DIV/${entity_id.slice(0, 6).toUpperCase()}/${period_month}`,
-      description: `Distribusi Profit — Periode ${period_month}`,
+      reference_number: `JRN/${distribution_type === 'PROFIT_SPLIT' ? 'PSP' : 'DIV'}/${entity_id.slice(0, 6).toUpperCase()}/${period_month}`,
+      description: `${distribution_type === 'PROFIT_SPLIT' ? 'Profit Split Mitra' : 'Dividen Pemegang Saham'} — Periode ${period_month}`,
       entity_id,
       status: 'APPROVED',
       created_by: session.user.id,
@@ -79,7 +87,7 @@ export async function POST(req: Request) {
       const pct = Number(sh.profit_split_percentage) || 0
       const amount = Math.round(netProfit * (pct / 100))
       if (amount <= 0) continue
-      jLines.push({ journal_id: journal.id, account_id: retainedId, debit: amount, credit: 0 })
+      jLines.push({ journal_id: journal.id, account_id: debitAccountId, debit: amount, credit: 0 })
       jLines.push({ journal_id: journal.id, account_id: bank_account_id, debit: 0, credit: amount })
       divRecords.push({
         stakeholder_id: sh.id,
@@ -87,6 +95,7 @@ export async function POST(req: Request) {
         net_profit_amount: netProfit,
         distributed_amount: amount,
         journal_id: journal.id,
+        distribution_type,
       })
     }
 
