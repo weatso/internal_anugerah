@@ -37,7 +37,8 @@ export default async function ClientPortalPage({ params }: { params: { token: st
     .from('workspace_logs')
     .select('*')
     .eq('project_id', project.id)
-    .eq('visibility', 'CLIENT')
+    .eq('visibility', 'CLIENT')        // kolom visibility: hanya CLIENT
+    .neq('status', 'INTERNAL_ONLY')   // filter ganda: status juga dicek
     .order('created_at', { ascending: true })
 
   const entity = (project.invoice as any)?.entities
@@ -122,7 +123,7 @@ export default async function ClientPortalPage({ params }: { params: { token: st
         {invoice && (
           <div className="rounded-xl p-5 border" style={{ background: `${accentColor}08`, borderColor: `${accentColor}25` }}>
             <h2 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: accentColor }}>Dokumen</h2>
-            <a href={`/api/generate-pdf?id=${invoice.id}`} target="_blank"
+            <a href={`/api/generate-pdf?id=${invoice.id}&token=${params.token}`} target="_blank"
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-all"
               style={{ background: accentColor, color: '#050505' }}>
               <FileText className="w-4 h-4" />
