@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import { formatRupiah } from '@/lib/utils'
-import { CheckCircle2, X, ArrowRight, Loader2, FileText, Lock } from 'lucide-react'
+import { CheckCircle2, X, ArrowRight, Loader2, FileText, Lock, FilePlus2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 interface Props {
@@ -27,6 +27,7 @@ export default function InvoicingClientActions({ doc, canConvert, canPay, isCEOO
   
   const [paying, setPaying] = useState(false)
   const [converting, setConverting] = useState(false)
+  const [creatingCR, setCreatingCR] = useState(false)
   const [hasBast, setHasBast] = useState(true)
 
   useEffect(() => {
@@ -88,6 +89,28 @@ export default function InvoicingClientActions({ doc, canConvert, canPay, isCEOO
     }
   }
 
+  async function handleCreateCR() {
+    if (!confirm('Apakah Anda yakin ingin membuat dokumen Change Request (CR) turunan dari SPK ini?')) return
+    
+    setCreatingCR(true)
+    try {
+      const res = await fetch('/api/commercial/create-cr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source_doc_id: doc.id })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Gagal membuat dokumen CR')
+      
+      toast.success('Dokumen Change Request (CR) berhasil dibuat!')
+      router.refresh()
+    } catch (err: any) {
+      toast.error(err.message)
+    } finally {
+      setCreatingCR(false)
+    }
+  }
+
   return (
     <>
       <div className="flex items-center justify-end gap-2">
@@ -105,6 +128,15 @@ export default function InvoicingClientActions({ doc, canConvert, canPay, isCEOO
             className="flex items-center gap-1 px-2.5 py-1.5 rounded text-[10px] font-bold transition-all hover:opacity-80"
             style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8' }}>
             <ArrowRight size={11} /> INVOICE
+          </button>
+        )}
+
+        {doc.doc_type === 'SPK' && isCEOOrFinance && (
+          <button onClick={handleCreateCR} disabled={creatingCR}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded text-[10px] font-bold transition-all hover:opacity-80"
+            style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b' }}
+            title="Buat Change Request (Revisi / Tambahan)">
+            {creatingCR ? <Loader2 className="w-3 h-3 animate-spin" /> : <FilePlus2 size={11} />} CR
           </button>
         )}
 

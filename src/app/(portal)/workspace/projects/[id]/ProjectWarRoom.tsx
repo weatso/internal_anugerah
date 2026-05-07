@@ -7,6 +7,7 @@ import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import { formatRupiah } from '@/lib/utils'
 import { Copy, FileText, Eye, EyeOff, Plus, Send, ArrowLeft, Timer, CheckCircle2, ListChecks, Trash2, Circle, Upload } from 'lucide-react'
+import ProjectProfitability from './ProjectProfitability'
 
 const SUBTABS = ['Overview', 'Tasks', 'Dokumen', 'Log Aktivitas', 'Reminders'] as const
 type SubTab = typeof SUBTABS[number]

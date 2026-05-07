@@ -21,7 +21,10 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
     .eq('magic_link_token', token)
     .single()
 
-  if (!project) {
+  const isExpired = project?.magic_link_expires_at && new Date() > new Date(project.magic_link_expires_at)
+  const isInactive = project?.magic_link_active === false
+
+  if (!project || isInactive || isExpired) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#050505]">
         <div className="text-center space-y-4 p-8 max-w-md">
