@@ -67,8 +67,22 @@ export const CommercialDocumentPDF = ({ data }: { data: any }) => {
           </View>
           <View style={styles.entityInfo}>
             <Text style={styles.entityName}>{data.entities?.name}</Text>
-            <Text style={styles.entitySub}>Member of Vision Velocity Ventures</Text>
-            <Text style={styles.entitySub}>Semarang, Indonesia</Text>
+            {data.entities?.name?.toLowerCase().includes('weatso') ? (
+              <>
+                <Text style={styles.entitySub}>Weatso Digital Agency HQ</Text>
+                <Text style={styles.entitySub}>Semarang, Jawa Tengah, Indonesia</Text>
+              </>
+            ) : data.entities?.name?.toLowerCase().includes('evory') ? (
+              <>
+                <Text style={styles.entitySub}>Evory Organizer Studio</Text>
+                <Text style={styles.entitySub}>Semarang, Jawa Tengah, Indonesia</Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.entitySub}>Member of Vision Velocity Ventures</Text>
+                <Text style={styles.entitySub}>Semarang, Indonesia</Text>
+              </>
+            )}
           </View>
         </View>
 
@@ -157,7 +171,7 @@ export const CommercialDocumentPDF = ({ data }: { data: any }) => {
 
         {/* FOOTER */}
         <Text style={styles.footer}>
-          Dokumen ini di-generate secara otomatis oleh sistem Vision Velocity Ventures.
+          Dokumen ini diterbitkan secara sah oleh {data.entities?.name || 'Vision Velocity Ventures'} dan digenerate otomatis oleh Anugerah OS.
         </Text>
       </Page>
     </Document>

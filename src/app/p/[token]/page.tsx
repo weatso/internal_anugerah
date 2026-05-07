@@ -2,7 +2,8 @@ import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { FileText, ExternalLink } from 'lucide-react'
+import { FileText, ExternalLink, CheckCircle2, Circle } from 'lucide-react'
+import ClientBASTActions from './ClientBASTActions'
 
 const admin = () => createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -42,7 +43,21 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
     .neq('status', 'INTERNAL_ONLY')   // filter ganda: status juga dicek
     .order('created_at', { ascending: true })
 
-  const entity = (project.invoice as any)?.entities
+  const { data: relatedInvoices } = await db
+    .from('commercial_documents')
+    .select('*')
+    .or(`id.eq.${project.invoice_id},id.eq.${project.spk_id},parent_id.eq.${project.spk_id}`)
+    .in('status', ['SENT', 'UNPAID', 'PAID', 'APPROVED'])
+    .order('created_at', { ascending: true })
+
+  const { data: tasks } = await db
+    .from('project_tasks')
+    .select('*')
+    .eq('project_id', project.id)
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true })
+
+  const entity = (project.invoice as any)?.entities || {}
   const client = project.client as any
   const invoice = project.invoice as any
   const accentColor = entity?.primary_color || '#D4AF37'
@@ -120,20 +135,63 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
           )}
         </div>
 
-        {/* Download Invoice */}
-        {invoice && (
-          <div className="rounded-xl p-5 border" style={{ background: `${accentColor}08`, borderColor: `${accentColor}25` }}>
-            <h2 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: accentColor }}>Dokumen</h2>
-            <a href={`/api/generate-pdf?id=${invoice.id}&token=${token}`} target="_blank"
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-all"
-              style={{ background: accentColor, color: '#050505' }}>
-              <FileText className="w-4 h-4" />
-              Unduh Invoice / Kwitansi
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-            <p className="text-[11px] text-neutral-600 mt-3">No. Dokumen: {invoice.doc_number} · Status: {invoice.status}</p>
+        {/* Download Invoices */}
+        {(relatedInvoices && relatedInvoices.length > 0) && (
+          <div>
+            <h2 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: accentColor }}>Dokumen Invoicing</h2>
+            <div className="space-y-3">
+              {relatedInvoices.map((inv: any) => (
+                <div key={inv.id} className="rounded-xl p-4 border flex items-center justify-between gap-4" style={{ background: `${accentColor}08`, borderColor: `${accentColor}25` }}>
+                  <div>
+                    <p className="font-bold text-white text-sm">{inv.doc_type} - {inv.termin_name || 'Dokumen Utama'}</p>
+                    <p className="text-[11px] text-neutral-500 mt-1">No. {inv.doc_number} · Status: <span className="font-bold text-white">{inv.status}</span></p>
+                  </div>
+                  <a href={`/api/generate-pdf?id=${inv.id}&token=${token}`} target="_blank"
+                    className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all shrink-0 hover:opacity-90"
+                    style={{ background: accentColor, color: '#050505' }}>
+                    <FileText className="w-3.5 h-3.5" /> Lihat PDF
+                  </a>
+                </div>
+              ))}
+            </div>
           </div>
         )}
+
+        {/* BAST Upload Actions */}
+        <div>
+          <h2 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: accentColor }}>Serah Terima</h2>
+          <ClientBASTActions project={project} accentColor={accentColor} />
+        </div>
+
+        {/* Tasks List */}
+        <div>
+          <h2 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: accentColor }}>Daftar Tugas (Tasks)</h2>
+          {!tasks || tasks.length === 0 ? (
+            <div className="text-center py-8 rounded-xl border border-dashed border-neutral-800">
+              <p className="text-neutral-600 text-sm">Belum ada tugas yang diinput.</p>
+            </div>
+          ) : (
+            <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border-subtle)' }}>
+              {tasks.map((task: any, i: number) => (
+                <div key={task.id} className="flex items-start gap-4 p-4 border-b last:border-0" style={{ borderColor: 'var(--border-subtle)', background: 'var(--bg-elevated)' }}>
+                  {task.status === 'DONE' ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
+                  ) : (
+                    <Circle className="w-5 h-5 text-neutral-600 shrink-0 mt-0.5" />
+                  )}
+                  <div>
+                    <p className="text-sm font-bold text-white" style={{ opacity: task.status === 'DONE' ? 0.6 : 1, textDecoration: task.status === 'DONE' ? 'line-through' : 'none' }}>
+                      {task.title}
+                    </p>
+                    {task.description && (
+                      <p className="text-[11px] text-neutral-400 mt-1">{task.description}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         <p className="text-center text-[11px] text-neutral-700 pb-4">
           Halaman ini dibuat secara otomatis oleh sistem {entity?.name || 'Anugerah Ventures'}.

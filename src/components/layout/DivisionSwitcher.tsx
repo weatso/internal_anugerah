@@ -1,79 +1,35 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { setActiveDivision } from '@/app/actions/workspace'
+import { Building2 } from 'lucide-react'
 
-type UserDivision = {
-  entity_id: string
-  role: string
-  entities: { name: string }
-}
-
-export default function DivisionSwitcher({ currentEntityId }: { currentEntityId?: string }) {
-  const [divisions, setDivisions] = useState<UserDivision[]>([])
-  const [loading, setLoading] = useState(true)
-  const router = useRouter()
-  const supabase = createClient()
-
+export default function DivisionSwitcher({ entityId }: { entityId?: string }) {
+  const [entityName, setEntityName] = useState('Memuat Divisi...')
+  
   useEffect(() => {
-    async function fetchUserDivisions() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+    if (!entityId) return
+    const supabase = createClient()
+    supabase.from('entities').select('name').eq('id', entityId).single().then(({ data }) => {
+      if (data) setEntityName(data.name)
+    })
+  }, [entityId])
 
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select(`
-          entity_id,
-          role,
-          entities ( name )
-        `)
-        .eq('user_id', user.id)
-
-      if (data && data.length > 0) {
-        setDivisions(data as any)
-        
-        if (!currentEntityId) {
-          await setActiveDivision(data[0].entity_id, data[0].role)
-          // PAKSA HARD RELOAD AGAR SERVER MEMBACA COOKIE BARU
-          window.location.reload() 
-        }
-      } else {
-        // PENTING: Jika user tidak punya divisi sama sekali, jangan biarkan loading terus
-        setLoading(false)
-      }
-    }
-
-    fetchUserDivisions()
-  }, [currentEntityId, supabase]) // Hapus router dari dependency jika tidak dipakai
-
-  const handleSwitch = async (entityId: string, role: string) => {
-    setLoading(true)
-    await setActiveDivision(entityId, role)
-    // PAKSA HARD RELOAD SAAT GANTI DIVISI
-    window.location.reload() 
+  if (!entityId) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-2 bg-white/5 rounded border border-white/10 text-xs text-neutral-400">
+        <Building2 className="w-4 h-4" />
+        <span>Pilih Divisi...</span>
+      </div>
+    )
   }
 
-  if (loading || divisions.length === 0) return <div className="animate-pulse bg-white/10 h-8 w-40 rounded"></div>
-
   return (
-    <div className="flex flex-col">
-      <span className="text-[10px] uppercase tracking-widest text-neutral-500 mb-1">Beroperasi Sebagai</span>
-      <select 
-        className="bg-neutral-900 border border-neutral-700 text-white text-sm rounded-md px-3 py-2 outline-none focus:ring-1 focus:ring-[#D4AF37]"
-        value={currentEntityId || ''}
-        onChange={(e) => {
-          const selected = divisions.find(d => d.entity_id === e.target.value)
-          if (selected) handleSwitch(selected.entity_id, selected.role)
-        }}
-      >
-        {divisions.map((div) => (
-          <option key={div.entity_id} value={div.entity_id}>
-            {div.entities.name} — ({div.role})
-          </option>
-        ))}
-      </select>
+    <div className="flex items-center gap-2 px-3 py-2 bg-[var(--gold)]/10 rounded border border-[var(--gold)]/30 group cursor-default">
+      <Building2 className="w-4 h-4 text-[var(--gold)]" />
+      <span className="text-xs font-bold tracking-widest uppercase text-[var(--gold)]">
+        {entityName}
+      </span>
     </div>
   )
 }

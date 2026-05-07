@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import { formatRupiah } from '@/lib/utils'
-import { CheckCircle2, X, ArrowRight, Loader2, FileText } from 'lucide-react'
+import { CheckCircle2, X, ArrowRight, Loader2, FileText, Lock } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
 interface Props {
   doc: any
@@ -26,6 +27,16 @@ export default function InvoicingClientActions({ doc, canConvert, canPay, isCEOO
   
   const [paying, setPaying] = useState(false)
   const [converting, setConverting] = useState(false)
+  const [hasBast, setHasBast] = useState(true)
+
+  useEffect(() => {
+    if (showConvertModal && doc.doc_type === 'SPK') {
+      const supabase = createClient()
+      supabase.from('projects').select('bast_signed_at').eq('spk_id', doc.id).single().then(({ data }) => {
+        setHasBast(!!data?.bast_signed_at)
+      })
+    }
+  }, [showConvertModal, doc.doc_type, doc.id])
 
   async function handlePay() {
     if (!selectedBank) return toast.error('Pilih rekening kas/bank tujuan.')
@@ -193,11 +204,28 @@ export default function InvoicingClientActions({ doc, canConvert, canPay, isCEOO
                 </div>
               )}
 
-              <button onClick={handleConvert} disabled={converting}
-                className="w-full py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
-                style={{ background: '#818cf8', color: '#fff' }}>
-                {converting ? <Loader2 className="w-4 h-4 animate-spin" /> : <><ArrowRight className="w-4 h-4" /> BUAT INVOICE TURUNAN</>}
-              </button>
+              {(() => {
+                const isFinalBilling = terminName.toLowerCase().includes('pelunasan') || terminName.toLowerCase().includes('final');
+                const isLocked = doc.doc_type === 'SPK' && isFinalBilling && !hasBast;
+                
+                return (
+                  <div className="space-y-3">
+                    {isLocked && (
+                      <div className="p-3 rounded bg-red-500/10 border border-red-500/20 flex gap-2">
+                        <Lock className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                        <p className="text-xs text-red-400">
+                          <strong>Blokir Penagihan:</strong> BAST belum diunggah. Anda tidak bisa menagih pelunasan tanpa BAST.
+                        </p>
+                      </div>
+                    )}
+                    <button onClick={handleConvert} disabled={converting || isLocked}
+                      className="w-full py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                      style={{ background: isLocked ? 'var(--bg-secondary)' : '#818cf8', color: isLocked ? 'var(--text-muted)' : '#fff' }}>
+                      {converting ? <Loader2 className="w-4 h-4 animate-spin" /> : isLocked ? <><Lock className="w-4 h-4" /> TERKUNCI</> : <><ArrowRight className="w-4 h-4" /> BUAT INVOICE TURUNAN</>}
+                    </button>
+                  </div>
+                )
+              })()}
             </motion.div>
           </div>
         )}

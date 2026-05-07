@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import { formatRupiah } from '@/lib/utils'
-import { Copy, FileText, Eye, EyeOff, Plus, Send, ArrowLeft, Timer, CheckCircle2, ListChecks, Trash2, Circle } from 'lucide-react'
+import { Copy, FileText, Eye, EyeOff, Plus, Send, ArrowLeft, Timer, CheckCircle2, ListChecks, Trash2, Circle, Upload } from 'lucide-react'
 
 const SUBTABS = ['Overview', 'Tasks', 'Dokumen', 'Log Aktivitas', 'Reminders'] as const
 type SubTab = typeof SUBTABS[number]
@@ -34,6 +34,8 @@ export default function ProjectWarRoom({ project, logs: initLogs, documents, cur
   const [taskForm, setTaskForm] = useState({ title: '', description: '', priority: 'MEDIUM', due_date: '' })
   const [addingTask, setAddingTask] = useState(false)
   const [showTaskForm, setShowTaskForm] = useState(false)
+  const [uploadingBast, setUploadingBast] = useState(false)
+  const [bastFile, setBastFile] = useState<File | null>(null)
 
   const accentColor = project.entities?.primary_color || 'var(--gold)'
   const client = project.clients
@@ -113,6 +115,37 @@ export default function ProjectWarRoom({ project, logs: initLogs, documents, cur
     await supabase.from('workspace_logs').update({ visibility: newVis }).eq('id', logId)
     setLogs(prev => prev.map(l => l.id === logId ? { ...l, visibility: newVis } : l))
     toast.success(newVis === 'CLIENT_VISIBLE' ? 'Sekarang terlihat oleh klien' : 'Disembunyikan dari klien')
+  }
+
+  async function handleUploadBast() {
+    if (!bastFile) return
+    setUploadingBast(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', bastFile)
+      formData.append('folder', 'bast')
+      formData.append('entity_id', project.entity_id)
+      
+      const res = await fetch('/api/storage/upload', { method: 'POST', body: formData })
+      if (!res.ok) throw new Error('Gagal mengunggah file BAST.')
+      const data = await res.json()
+      
+      const { error } = await supabase.from('projects').update({
+        bast_url: data.key,
+        bast_signed_at: new Date().toISOString(),
+        is_ready_for_final_billing: true
+      }).eq('id', project.id)
+      
+      if (error) throw error
+      
+      toast.success('BAST berhasil diunggah dan otomatis ditandatangani!')
+      project.bast_url = data.key
+      project.bast_signed_at = new Date().toISOString()
+      setBastFile(null)
+    } catch (err: any) {
+      toast.error(err.message)
+    }
+    setUploadingBast(false)
   }
 
   // Countdown
@@ -397,6 +430,38 @@ export default function ProjectWarRoom({ project, logs: initLogs, documents, cur
               </tbody>
             </table>
           )}
+
+          {/* BAST Upload Section */}
+          <div className="p-5 border-t mt-4" style={{ borderColor: 'var(--border-subtle)', background: 'var(--bg-primary)' }}>
+            <h2 className="text-sm font-black tracking-tight mb-2" style={{ color: 'var(--text-primary)' }}>Berita Acara Serah Terima (BAST)</h2>
+            <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
+              Unggah dokumen BAST yang telah ditandatangani klien untuk membuka kunci penagihan termin pelunasan.
+            </p>
+            {project.bast_signed_at ? (
+              <div className="flex items-center gap-3 p-3 rounded bg-emerald-500/10 border border-emerald-500/20">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                <div>
+                  <p className="text-sm font-bold text-emerald-400">BAST Telah Ditandatangani</p>
+                  <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                    Pada {new Date(project.bast_signed_at).toLocaleString('id-ID')}
+                  </p>
+                </div>
+                {project.bast_url && (
+                  <a href={`/api/storage/file?key=${encodeURIComponent(project.bast_url)}`} target="_blank"
+                    className="ml-auto text-xs font-bold px-3 py-1.5 rounded bg-emerald-400 text-black">
+                    Lihat Dokumen
+                  </a>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row items-center gap-3">
+                <input type="file" onChange={e => setBastFile(e.target.files?.[0] || null)} className="text-xs file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[var(--gold)] file:text-black hover:file:bg-[var(--gold)]/90 flex-1" accept=".pdf,.png,.jpg,.jpeg" />
+                <button onClick={handleUploadBast} disabled={!bastFile || uploadingBast} className="flex items-center gap-2 px-4 py-2 rounded-md text-xs font-bold disabled:opacity-50 transition-all shrink-0" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>
+                  {uploadingBast ? 'Mengunggah...' : <><Upload className="w-4 h-4" /> Unggah & Kunci BAST</>}
+                </button>
+              </div>
+            )}
+          </div>
         </motion.div>
       )}
 

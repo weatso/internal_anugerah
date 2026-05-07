@@ -149,7 +149,7 @@ export function Sidebar({ onClose, activeRole = 'STAFF', activeEntityId }: Sideb
 
       {/* DI SINILAH SETIR DIVISI DITEMPATKAN */}
       <div className="p-4 border-b border-white/5 bg-black/20">
-        <DivisionSwitcher currentEntityId={activeEntityId} />
+        <DivisionSwitcher entityId={activeEntityId} />
       </div>
 
       <nav className="flex-1 py-5 px-3 space-y-0.5 overflow-y-auto">

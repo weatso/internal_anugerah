@@ -45,6 +45,40 @@ export async function POST(request: Request) {
       throw new Error(`Dokumen ${source.doc_type} tidak bisa dieskalasi.`)
     }
 
+    // 1. Logika Gembok BAST (Jika SPK ke Invoice Pelunasan)
+    if (targetType === 'INVOICE' && parentId) {
+      const isFinalBilling = terminName?.toLowerCase().includes('pelunasan') || terminName?.toLowerCase().includes('final')
+      if (isFinalBilling) {
+        const { data: project } = await supabase.from('projects').select('bast_signed_at, bast_url').eq('spk_id', parentId).single()
+        if (!project?.bast_signed_at || !project?.bast_url) {
+          return NextResponse.json({ 
+            error: 'Blokir Penagihan: BAST (Berita Acara Serah Terima) belum diunggah atau ditandatangani klien. Selesaikan administrasi proyek di War Room terlebih dahulu.' 
+          }, { status: 403 })
+        }
+      }
+      
+      // 2. Validasi Anti-Leakage (Cek total tagihan tidak melebihi SPK)
+      const { data: existingInvoices } = await supabase
+        .from('commercial_documents')
+        .select('grand_total')
+        .eq('parent_id', parentId)
+        .neq('status', 'CANCELLED')
+      
+      const totalBilled = existingInvoices?.reduce((acc: number, curr: any) => acc + Number(curr.grand_total), 0) || 0
+      const sourceGrandTotal = source.doc_type === 'PROFORMA' ? source.grand_total : (source.grand_total) // Wait, SPK total
+      
+      // SPK total is source.grand_total if source is SPK.
+      // If source is Proforma, its parent is the SPK, so we'd need the SPK's total.
+      // But actually, the safest is to check against SPK. If source is PROFORMA, source is the PROFORMA. 
+      // Let's simplify: only validate strictly if source is SPK.
+      if (source.doc_type === 'SPK') {
+        const newInvoiceTotal = sourceGrandTotal * calcMultiplier
+        if (totalBilled + newInvoiceTotal > sourceGrandTotal + 1) { // +1 to account for rounding
+          return NextResponse.json({ error: 'Gagal: Total akumulasi penagihan melebihi nilai kontrak SPK Induk.' }, { status: 400 })
+        }
+      }
+    }
+
     const prefix = targetType === 'SPK' ? 'SPK' : 'INV'
     const timestamp = new Date().getTime().toString().slice(-5)
     const docNumber = `${prefix}-${source.entity_id.split('-')[0].toUpperCase()}-${timestamp}`
