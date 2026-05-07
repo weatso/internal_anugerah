@@ -2,7 +2,6 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { Toaster } from 'sonner'
-import { UserProvider } from '@/components/providers/UserProvider'
 import { ThemeProvider } from 'next-themes'
 
 const inter = Inter({
@@ -28,11 +27,9 @@ export default function RootLayout({
   return (
     <html lang="id" suppressHydrationWarning>
       <body className={inter.variable}>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
-          <UserProvider>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>   
             {children}
             <Toaster richColors position="top-right" />
-          </UserProvider>
         </ThemeProvider>
       </body>
     </html>

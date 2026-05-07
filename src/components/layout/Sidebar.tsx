@@ -11,16 +11,16 @@ import {
   Receipt, BookOpen, Package, ArrowLeftRight, Layers, DollarSign,
   PieChart, BarChart3, Tag
 } from 'lucide-react'
-import { useUser } from '@/components/providers/UserProvider'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
+import DivisionSwitcher from './DivisionSwitcher'
 
 const FINANCE_ITEMS = [
-  { href: '/finance/transactions',     label: 'Buku Besar',          icon: BookOpen,       roles: ['CEO','FINANCE','HEAD','STAFF'] },
-  { href: '/finance/master-data',      label: 'Master COA',          icon: Layers,         roles: ['CEO'] },
+  { href: '/finance/transactions',     label: 'Buku Besar',          icon: BookOpen,      roles: ['CEO','FINANCE','HEAD','STAFF'] },
+  { href: '/finance/master-data',      label: 'Master COA',          icon: Layers,        roles: ['CEO'] },
   { href: '/finance/transfer-pricing', label: 'Transfer Pricing',    icon: ArrowLeftRight, roles: ['CEO','FINANCE'] },
-  { href: '/finance/amortization',     label: 'Amortisasi Revenue',  icon: Layers,         roles: ['CEO','FINANCE'] },
+  { href: '/finance/amortization',     label: 'Amortisasi Revenue',  icon: Layers,        roles: ['CEO','FINANCE'] },
   { href: '/finance/commissions',      label: 'Komisi Sales',        icon: DollarSign,     roles: ['CEO','FINANCE'] },
   { href: '/finance/dividends',        label: 'Profit Split & Dividen', icon: PieChart,    roles: ['CEO'] },
   { href: '/finance/reports',          label: 'Laporan Keuangan',    icon: BarChart3,      roles: ['CEO','FINANCE'] },
@@ -32,40 +32,55 @@ const TOP_NAV = [
 
 const BOTTOM_NAV = [
   { href: '/invoicing',   label: 'Komersial',           icon: Receipt,      roles: ['CEO','FINANCE','HEAD'] },
-  { href: '/catalogue',   label: 'Katalog & Portofolio', icon: Tag,         roles: ['CEO','FINANCE','HEAD','STAFF','DESIGN'] },
+  { href: '/catalogue',   label: 'Katalog & Portofolio', icon: Tag,          roles: ['CEO','FINANCE','HEAD','STAFF','DESIGN'] },
   { href: '/workspace',   label: 'Workspace',           icon: FolderKanban, roles: ['CEO','FINANCE','HEAD','STAFF','DESIGN'] },
   { href: '/clients',     label: 'CRM / Klien',         icon: Briefcase,    roles: ['CEO','FINANCE','HEAD','STAFF'] },
   { href: '/admin',       label: 'Admin Panel',         icon: ShieldCheck,  roles: ['CEO'] },
   { href: '/settings',    label: 'Settings',            icon: Settings,     roles: ['CEO','FINANCE','HEAD','STAFF','DESIGN'] },
 ]
 
-interface SidebarProps { onClose?: () => void }
+// KITA TAMBAHKAN PROPS activeRole dan activeEntityId DARI SERVER
+interface SidebarProps { 
+  onClose?: () => void;
+  activeRole?: string;
+  activeEntityId?: string;
+}
 
-export function Sidebar({ onClose }: SidebarProps) {
+export function Sidebar({ onClose, activeRole = 'STAFF', activeEntityId }: SidebarProps) {
   const [width, setWidth] = useState(260)
   const [isResizing, setIsResizing] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [financeOpen, setFinanceOpen] = useState(false)
+  const [profile, setProfile] = useState<any>(null)
 
   const pathname = usePathname()
+  const router = useRouter()
   const supabase = createClient()
-  const { profile, highestRole, loading, effectiveEntity } = useUser()
   const { theme, setTheme } = useTheme()
 
-  useEffect(() => setMounted(true), [])
+  useEffect(() => {
+    setMounted(true)
+    // Ambil data profil langsung di sini, tanpa lewat UserProvider yang bermasalah
+    async function loadProfile() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+        setProfile(data)
+      }
+    }
+    loadProfile()
+  }, [supabase])
 
-  // Auto-open finance accordion if on a finance page
   useEffect(() => {
     if (pathname.startsWith('/finance')) setFinanceOpen(true)
   }, [pathname])
 
-  const currentRole = highestRole ?? 'STAFF'
-
   const handleSignOut = async () => {
-    try { await supabase.auth.signOut() }
-    catch (error) { console.error('Gagal keluar:', error) }
+    await supabase.auth.signOut()
+    window.location.href = '/login'
   }
 
+  // --- Logika Resize ---
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing) return
@@ -101,9 +116,9 @@ export function Sidebar({ onClose }: SidebarProps) {
     )
   }
 
-  const visibleFinance = FINANCE_ITEMS.filter(i => i.roles.includes(currentRole))
+  // Gunakan activeRole dari Server Props
+  const visibleFinance = FINANCE_ITEMS.filter(i => i.roles.includes(activeRole))
   const isFinanceActive = pathname.startsWith('/finance')
-  const isCatalogueActive = pathname.startsWith('/catalogue')
 
   return (
     <motion.aside
@@ -112,17 +127,15 @@ export function Sidebar({ onClose }: SidebarProps) {
       className="relative flex flex-col h-screen border-r z-30 shrink-0"
       style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-subtle)' }}
     >
-      {/* Resize Handle */}
       <div
         className="absolute right-0 top-0 w-1.5 h-full cursor-col-resize z-40 transition-colors hover:bg-[var(--gold)]"
         onMouseDown={(e) => { e.preventDefault(); setIsResizing(true) }}
       />
 
-      {/* Logo */}
       <div className="p-5 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
         <div className="flex items-center gap-3">
           <div className="relative w-8 h-8 shrink-0">
-            <Image src="/logo.png" alt="Anugerah" fill className="object-contain" />
+            <Image src="/logo.png" alt="Anugerah" fill sizes="32px" className="object-contain" />
           </div>
           <div className="overflow-hidden whitespace-nowrap">
             <p className="font-black text-sm tracking-tighter uppercase" style={{ color: 'var(--text-primary)' }}>ANUGERAH</p>
@@ -134,14 +147,16 @@ export function Sidebar({ onClose }: SidebarProps) {
         </button>
       </div>
 
-      {/* Nav */}
+      {/* DI SINILAH SETIR DIVISI DITEMPATKAN */}
+      <div className="p-4 border-b border-white/5 bg-black/20">
+        <DivisionSwitcher currentEntityId={activeEntityId} />
+      </div>
+
       <nav className="flex-1 py-5 px-3 space-y-0.5 overflow-y-auto">
-        {/* Dashboard */}
-        {TOP_NAV.filter(i => i.roles.includes(currentRole)).map(item => (
+        {TOP_NAV.filter(i => i.roles.includes(activeRole)).map(item => (
           <NavLink key={item.href} {...item} />
         ))}
 
-        {/* Finance Accordion */}
         {visibleFinance.length > 0 && (
           <div>
             <div className="flex items-center">
@@ -160,7 +175,7 @@ export function Sidebar({ onClose }: SidebarProps) {
               </Link>
               <button
                 onClick={() => setFinanceOpen(p => !p)}
-                className={cn('p-2.5 rounded-sm transition-all', isFinanceActive ? '' : '')}
+                className="p-2.5 rounded-sm transition-all"
                 style={isFinanceActive ? { color: 'var(--gold)' } : { color: 'var(--text-muted)' }}
               >
                 <motion.div animate={{ rotate: financeOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
@@ -203,21 +218,19 @@ export function Sidebar({ onClose }: SidebarProps) {
           </div>
         )}
 
-        {/* Bottom Nav */}
-        {BOTTOM_NAV.filter(i => i.roles.includes(currentRole)).map(item => (
+        {BOTTOM_NAV.filter(i => i.roles.includes(activeRole)).map(item => (
           <NavLink key={item.href} {...item} />
         ))}
       </nav>
 
-      {/* Footer */}
-      {!loading && profile && (
+      {profile && (
         <div className="mt-auto p-4" style={{ borderTop: '1px solid var(--border-subtle)' }}>
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-3 overflow-hidden flex-1">
-              {(profile as any).avatar_url ? (
+              {profile.avatar_url ? (
                 <div className="w-8 h-8 rounded-full shrink-0 overflow-hidden border" style={{ borderColor: 'var(--gold-glow)' }}>
                   <img
-                    src={(profile as any).avatar_url.startsWith('http') ? (profile as any).avatar_url : `/api/storage/file?key=${encodeURIComponent((profile as any).avatar_url)}`}
+                    src={profile.avatar_url.startsWith('http') ? profile.avatar_url : `/api/storage/file?key=${encodeURIComponent(profile.avatar_url)}`}
                     alt="Profile" className="w-full h-full object-cover"
                   />
                 </div>
@@ -230,7 +243,7 @@ export function Sidebar({ onClose }: SidebarProps) {
               <div className="overflow-hidden whitespace-nowrap">
                 <p className="text-[11px] font-bold truncate leading-none mb-1" style={{ color: 'var(--text-primary)' }}>{profile.full_name}</p>
                 <p className="text-[9px] uppercase tracking-widest font-medium truncate" style={{ color: 'var(--text-muted)' }}>
-                  {currentRole} · {effectiveEntity?.name || 'Holding'}
+                  {activeRole}
                 </p>
               </div>
             </div>
@@ -239,19 +252,13 @@ export function Sidebar({ onClose }: SidebarProps) {
               {mounted && (
                 <button
                   onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                  className="p-1.5 rounded-sm transition-all"
+                  className="p-1.5 rounded-sm transition-all hover:bg-white/10"
                   style={{ color: 'var(--text-muted)' }}
-                  title={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
                 >
                   {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
                 </button>
               )}
-              <button
-                onClick={handleSignOut}
-                className="p-1.5 rounded-sm transition-all"
-                style={{ color: 'var(--text-muted)' }}
-                title="Keluar"
-              >
+              <button onClick={handleSignOut} className="p-1.5 rounded-sm transition-all hover:bg-white/10" style={{ color: 'var(--text-muted)' }}>
                 <LogOut className="w-4 h-4" />
               </button>
             </div>
