@@ -1,84 +1,108 @@
-import { createServerClient } from '@supabase/ssr'
-import { createClient } from '@supabase/supabase-js'
-import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 
-export async function POST(req: Request) {
+export async function POST(request: Request) {
   try {
-    const cookieStore = await cookies()
-    const supabaseAuth = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { cookies: { getAll() { return cookieStore.getAll() } } }
-    )
-    const { data: { session } } = await supabaseAuth.auth.getSession()
-    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Sesi tidak valid.' }, { status: 401 })
 
-    const { source_doc_id } = await req.json()
-    if (!source_doc_id) return NextResponse.json({ error: 'source_doc_id diperlukan' }, { status: 400 })
+    // TANGKAP PAYLOAD BARU: termin_name dan percentage
+    const { source_doc_id, termin_name, percentage } = await request.json()
+    if (!source_doc_id) return NextResponse.json({ error: 'ID tidak ditemukan.' }, { status: 400 })
 
-    const db = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    )
-
-    // 1. Fetch source document + line items
-    const { data: source, error: sErr } = await db
+    const { data: source, error: sourceErr } = await supabase
       .from('commercial_documents')
       .select('*, document_line_items(*)')
       .eq('id', source_doc_id)
       .single()
-    if (sErr || !source) return NextResponse.json({ error: 'Dokumen asal tidak ditemukan' }, { status: 404 })
-    if (source.doc_type === 'INVOICE') return NextResponse.json({ error: 'Dokumen ini sudah berupa Invoice' }, { status: 400 })
+      
+    if (sourceErr || !source) throw new Error('Dokumen asal gagal ditarik.')
 
-    // 2. Generate new invoice number
-    const divCode = source.doc_number.split('/')[1] || 'AV'
-    const newDocNumber = `INV/${divCode}/${new Date().getFullYear()}/${Math.floor(1000 + Math.random() * 9000)}`
+    let targetType = 'INVOICE'
+    let parentId = null
+    let terminName = null
+    let targetStatus = 'UNPAID'
+    let calcMultiplier = 1 // Default 100%
 
-    // 3. Duplicate document as INVOICE
-    const { data: newDoc, error: nErr } = await db.from('commercial_documents').insert({
-      entity_id: source.entity_id,
-      client_id: source.client_id,
-      doc_type: 'INVOICE',
-      doc_number: newDocNumber,
-      title: source.title,
-      content_blocks: source.content_blocks,
-      subtotal: source.subtotal,
-      tax_rate: source.tax_rate,
-      tax_amount: source.tax_amount,
-      grand_total: source.grand_total,
-      status: 'DRAFT',
-      issue_date: new Date().toISOString().slice(0, 10),
-      due_date: source.due_date,
-      created_by: session.user.id,
-    }).select().single()
-    if (nErr || !newDoc) throw new Error(`Gagal membuat invoice: ${nErr?.message}`)
-
-    // 4. Duplicate line items
-    const lineItems = source.document_line_items || []
-    if (lineItems.length > 0) {
-      await db.from('document_line_items').insert(
-        lineItems.map((item: any, idx: number) => ({
-          document_id: newDoc.id,
-          description: item.description,
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-          total_price: item.total_price,
-          original_price: item.original_price,
-          discount_amount: item.discount_amount,
-          is_recurring: item.is_recurring,
-          duration_months: item.duration_months,
-          revenue_account_id: item.revenue_account_id,
-          deferred_account_id: item.deferred_account_id,
-          sort_order: idx,
-        }))
-      )
+    // LOGIKA PEMISAHAN
+    if (source.doc_type === 'QUOTATION') {
+      targetType = 'SPK'
+      parentId = null 
+      targetStatus = 'APPROVED'
+    } else if (source.doc_type === 'SPK') {
+      targetType = 'INVOICE'
+      parentId = source.id
+      terminName = termin_name || 'Termin Penagihan'
+      targetStatus = 'UNPAID'
+      calcMultiplier = percentage ? Number(percentage) / 100 : 1 // Hitung rasio
+    } else if (source.doc_type === 'PROFORMA') {
+      targetType = 'INVOICE'
+      parentId = source.parent_id 
+      terminName = source.termin_name
+      targetStatus = 'UNPAID'
+    } else {
+      throw new Error(`Dokumen ${source.doc_type} tidak bisa dieskalasi.`)
     }
 
-    return NextResponse.json({ success: true, new_doc_id: newDoc.id, doc_number: newDocNumber })
-  } catch (err: any) {
-    console.error('[API /commercial/convert-to-invoice]', err)
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    const prefix = targetType === 'SPK' ? 'SPK' : 'INV'
+    const timestamp = new Date().getTime().toString().slice(-5)
+    const docNumber = `${prefix}-${source.entity_id.split('-')[0].toUpperCase()}-${timestamp}`
+
+    // CETAK DOKUMEN DENGAN NOMINAL YANG SUDAH DIPOTONG PERSENTASE
+    const { data: newDoc, error: insertErr } = await supabase
+      .from('commercial_documents')
+      .insert({
+        entity_id: source.entity_id,
+        client_id: source.client_id,
+        doc_type: targetType,
+        doc_number: docNumber,
+        title: source.title,
+        subtotal: source.subtotal * calcMultiplier,
+        tax_rate: source.tax_rate,
+        tax_amount: source.tax_amount * calcMultiplier,
+        grand_total: source.grand_total * calcMultiplier,
+        status: targetStatus,
+        parent_id: parentId,
+        termin_name: terminName,
+        created_by: user.id
+      })
+      .select().single()
+
+    if (insertErr) throw insertErr
+
+    // DUPLIKASI ITEM DAN SESUAIKAN HARGA
+    if (source.document_line_items && source.document_line_items.length > 0) {
+      const newItems = source.document_line_items.map((item: any) => ({
+        document_id: newDoc.id,
+        description: item.description,
+        quantity: item.quantity,
+        unit_price: item.unit_price * calcMultiplier, // Harga satuan dipotong
+        total_price: item.total_price * calcMultiplier, // Total dipotong
+        sort_order: item.sort_order,
+        is_recurring: item.is_recurring,
+        duration_months: item.duration_months,
+        revenue_account_id: item.revenue_account_id,
+        deferred_account_id: item.deferred_account_id
+      }))
+      const { error: lineErr } = await supabase.from('document_line_items').insert(newItems)
+      if (lineErr) throw new Error('Gagal menduplikasi detail item.')
+    }
+
+    // TRIGGER WAR ROOM JIKA SPK
+    if (targetType === 'SPK') {
+      await supabase.from('projects').insert({
+        entity_id: source.entity_id,
+        client_id: source.client_id,
+        spk_id: newDoc.id,
+        name: source.title,
+        description: `Proyek diinisialisasi dari SPK: ${docNumber}.`,
+        status: 'ACTIVE'
+      })
+    }
+
+    return NextResponse.json({ success: true, doc_number: newDoc.doc_number })
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 400 })
   }
 }

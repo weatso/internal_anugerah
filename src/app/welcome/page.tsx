@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useUser } from '@/components/providers/UserProvider'
+import { createClient } from '@/lib/supabase/client'
+import { setActiveDivision } from '@/app/actions/workspace'
 
 const ROLE_LABEL: Record<string, string> = {
   CEO: 'CEO',
@@ -14,36 +15,69 @@ const ROLE_LABEL: Record<string, string> = {
 
 export default function WelcomePage() {
   const router = useRouter()
-  // Tarik data langsung dari Provider pusat
-  const { profile, highestRole, loading } = useUser()
+  const supabase = createClient()
+  
   const [visible, setVisible] = useState(false)
+  const [profileData, setProfileData] = useState<{ firstName: string; displayRole: string } | null>(null)
+  const [isProcessing, setIsProcessing] = useState(true)
 
   useEffect(() => {
-    // Jika masih loading, tahan eksekusi
-    if (loading) return;
+    async function initializeSession() {
+      // 1. Tarik user session
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        router.replace('/login')
+        return
+      }
 
-    // Jika tidak ada profil, lemparkan keluar
-    if (!profile) {
-      router.replace('/login');
-      return;
+      // 2. Tarik nama profile
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .single()
+
+      // 3. Tarik role dari user_roles (Untuk set Cookie)
+      const { data: roles } = await supabase
+        .from('user_roles')
+        .select('entity_id, role')
+        .eq('user_id', user.id)
+
+      if (profile && roles && roles.length > 0) {
+        // Set state untuk animasi UI
+        const firstName = profile.full_name ? profile.full_name.split(' ')[0] : 'User'
+        const highestRole = roles[0].role // Ambil role pertama sebagai default
+        setProfileData({
+          firstName,
+          displayRole: ROLE_LABEL[highestRole] ?? highestRole
+        })
+
+        // SUNTIKKAN COOKIE KE SERVER
+        await setActiveDivision(roles[0].entity_id, roles[0].role)
+
+        // Matikan loading, trigger animasi
+        setIsProcessing(false)
+        requestAnimationFrame(() => setVisible(true))
+
+        // Redirect otomatis ke dashboard setelah 2.8 detik
+        setTimeout(() => {
+          router.replace('/dashboard')
+        }, 2800)
+
+      } else {
+        // User terdaftar tapi tidak punya role di divisi manapun
+        setIsProcessing(false)
+        alert("Akses ditolak: Anda belum di-assign ke divisi manapun. Hubungi CEO.")
+        router.replace('/login')
+      }
     }
 
-    // Trigger animasi HTML
-    requestAnimationFrame(() => setVisible(true))
+    initializeSession()
+  }, [router, supabase])
 
-    // Redirect otomatis ke dashboard setelah 2.8 detik
-    const timer = setTimeout(() => {
-      router.replace('/dashboard')
-    }, 2800)
-
-    return () => clearTimeout(timer)
-  }, [profile, loading, router])
-
-  // Cegah flicker kosong saat loading
-  if (loading || !profile) return null;
-
-  const firstName = profile.full_name.split(' ')[0]
-  const displayRole = highestRole ? (ROLE_LABEL[highestRole] ?? highestRole) : 'Staff'
+  // Cegah flicker kosong saat loading data backend
+  if (isProcessing || !profileData) return null;
 
   return (
     <div
@@ -85,9 +119,9 @@ export default function WelcomePage() {
           }}
         >
           Halo,{' '}
-          <span className="text-[#D4AF37]">{displayRole}</span>
+          <span className="text-[#D4AF37]">{profileData.displayRole}</span>
           <br />
-          {firstName}
+          {profileData.firstName}
         </h1>
 
         <p
