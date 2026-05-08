@@ -17,14 +17,19 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
 
   const { data: project } = await db
     .from('projects')
-    .select('*, client:clients(*), invoice:commercial_documents(*, entities(name, primary_color, logo_key))')
+    .select(`
+      id, name, status, magic_link_active, spk_id,
+      start_date, end_date, invoice_id, bast_url, bast_signed_at,
+      client:clients ( company_name, pic_name ),
+      invoice:commercial_documents!projects_invoice_id_fkey (
+        id, doc_number, grand_total, status, doc_type, issue_date,
+        entities ( name, primary_color, logo_key )
+      )
+    `)
     .eq('magic_link_token', token)
     .single()
 
-  const isExpired = project?.magic_link_expires_at && new Date() > new Date(project.magic_link_expires_at)
-  const isInactive = project?.magic_link_active === false
-
-  if (!project || isInactive || isExpired) {
+  if (!project || !project.magic_link_active) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#050505]">
         <div className="text-center space-y-4 p-8 max-w-md">
@@ -32,7 +37,7 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
             <FileText className="w-8 h-8 text-red-500" />
           </div>
           <h1 className="text-xl font-black text-white uppercase tracking-tight">Tautan Tidak Valid</h1>
-          <p className="text-neutral-500 text-sm">Tautan ini telah kadaluarsa atau tidak ditemukan. Silakan hubungi tim kami untuk mendapatkan tautan baru.</p>
+          <p className="text-neutral-500 text-sm">Tautan ini tidak aktif atau tidak ditemukan. Silakan hubungi tim kami untuk mendapatkan tautan baru.</p>
         </div>
       </div>
     )
@@ -48,7 +53,7 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
 
   const { data: relatedInvoices } = await db
     .from('commercial_documents')
-    .select('*')
+    .select('id, doc_number, title, grand_total, status, doc_type, issue_date, termin_name, parent_id')
     .or(`id.eq.${project.invoice_id},id.eq.${project.spk_id},parent_id.eq.${project.spk_id}`)
     .in('status', ['SENT', 'UNPAID', 'PAID', 'APPROVED'])
     .order('created_at', { ascending: true })

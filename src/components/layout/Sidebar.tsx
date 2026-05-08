@@ -14,16 +14,17 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
-import DivisionSwitcher from './DivisionSwitcher'
+import { UnifiedSwitcher } from './UnifiedSwitcher'
 
 const FINANCE_ITEMS = [
-  { href: '/finance/transactions',     label: 'Buku Besar',          icon: BookOpen,      roles: ['CEO','FINANCE','HEAD','STAFF'] },
-  { href: '/finance/master-data',      label: 'Master COA',          icon: Layers,        roles: ['CEO'] },
-  { href: '/finance/transfer-pricing', label: 'Transfer Pricing',    icon: ArrowLeftRight, roles: ['CEO','FINANCE'] },
-  { href: '/finance/amortization',     label: 'Amortisasi Revenue',  icon: Layers,        roles: ['CEO','FINANCE'] },
-  { href: '/finance/commissions',      label: 'Komisi Sales',        icon: DollarSign,     roles: ['CEO','FINANCE'] },
-  { href: '/finance/dividends',        label: 'Profit Split & Dividen', icon: PieChart,    roles: ['CEO'] },
-  { href: '/finance/reports',          label: 'Laporan Keuangan',    icon: BarChart3,      roles: ['CEO','FINANCE'] },
+  { href: '/finance/transactions',     label: 'Buku Besar',             icon: BookOpen,       roles: ['CEO','FINANCE','HEAD','STAFF'] },
+  { href: '/finance/expenses',         label: 'Biaya & Pengeluaran',    icon: Receipt,        roles: ['CEO','FINANCE','HEAD'] },
+  { href: '/finance/reports',          label: 'Laporan P&L',            icon: BarChart3,      roles: ['CEO','FINANCE','HEAD'] },
+  { href: '/finance/master-data',      label: 'Master COA',             icon: Layers,         roles: ['CEO'] },
+  { href: '/finance/transfer-pricing', label: 'Transfer Pricing',       icon: ArrowLeftRight, roles: ['CEO','FINANCE'] },
+  { href: '/finance/amortization',     label: 'Amortisasi Revenue',     icon: Layers,         roles: ['CEO','FINANCE'] },
+  { href: '/finance/commissions',      label: 'Komisi Sales',           icon: DollarSign,     roles: ['CEO','FINANCE'] },
+  { href: '/finance/dividends',        label: 'Profit Split & Dividen', icon: PieChart,       roles: ['CEO'] },
 ]
 
 const TOP_NAV = [
@@ -147,9 +148,9 @@ export function Sidebar({ onClose, activeRole = 'STAFF', activeEntityId }: Sideb
         </button>
       </div>
 
-      {/* DI SINILAH SETIR DIVISI DITEMPATKAN */}
+      {/* UNIFIED CAPACITY SWITCHER */}
       <div className="p-4 border-b border-white/5 bg-black/20">
-        <DivisionSwitcher entityId={activeEntityId} />
+        <UnifiedSwitcher activeRole={activeRole} activeEntityId={activeEntityId} />
       </div>
 
       <nav className="flex-1 py-5 px-3 space-y-0.5 overflow-y-auto">

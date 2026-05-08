@@ -67,7 +67,127 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, data: expense })
   } catch (err: any) {
-    console.error('[API /finance/expenses]', err)
+    console.error('[API /finance/expenses POST]', err)
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
+
+/**
+ * DELETE /api/finance/expenses?id=<expense_id>&reason=<optional>
+ * 
+ * HUKUM AKUNTANSI: TIDAK pernah melakukan hard delete pada journal_entries.
+ * Alur:
+ *  1. Ambil expense beserta journal aslinya (termasuk journal lines + akun).
+ *  2. Buat Jurnal Reversal (mirror: debit ↔ credit dibalik).
+ *  3. Tandai journal asli sebagai is_reversed=true, referensikan reversal journal.
+ *  4. Tandai expense sebagai VOID (kolom status).
+ */
+export async function DELETE(req: Request) {
+  try {
+    const cookieStore = await cookies()
+    const supabaseAuth = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { cookies: { getAll() { return cookieStore.getAll() } } }
+    )
+    const { data: { session } } = await supabaseAuth.auth.getSession()
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { searchParams } = new URL(req.url)
+    const expenseId = searchParams.get('id')
+    const reason = searchParams.get('reason') || 'Pembatalan pengeluaran oleh pengguna'
+
+    if (!expenseId) {
+      return NextResponse.json({ error: 'Parameter expense id wajib diisi' }, { status: 400 })
+    }
+
+    const db = admin()
+
+    // 1. Ambil expense + journal asli + semua journal lines
+    const { data: expense, error: expFetchErr } = await db
+      .from('expenses')
+      .select('*, journal:journal_entries(*, lines:journal_lines(*))')
+      .eq('id', expenseId)
+      .single()
+
+    if (expFetchErr || !expense) {
+      return NextResponse.json({ error: 'Pengeluaran tidak ditemukan' }, { status: 404 })
+    }
+
+    if ((expense as any).status === 'VOID') {
+      return NextResponse.json({ error: 'Pengeluaran ini sudah dibatalkan (VOID)' }, { status: 409 })
+    }
+
+    const originalJournal = (expense as any).journal
+    if (!originalJournal) {
+      return NextResponse.json({ error: 'Jurnal terkait tidak ditemukan' }, { status: 404 })
+    }
+
+    if (originalJournal.is_reversed) {
+      return NextResponse.json({ error: 'Jurnal ini sudah pernah di-reverse' }, { status: 409 })
+    }
+
+    // 2. Buat Jurnal Reversal (flip debit ↔ credit)
+    const reversalRef = `REV/${new Date().getFullYear()}/${Math.floor(1000 + Math.random() * 9000)}`
+    const { data: reversalJournal, error: rjErr } = await db
+      .from('journal_entries')
+      .insert({
+        transaction_date: new Date().toISOString().slice(0, 10),
+        reference_number: reversalRef,
+        description: `[REVERSAL] ${originalJournal.description} — ${reason}`,
+        entity_id: originalJournal.entity_id,
+        status: 'APPROVED',
+        cancellation_reason: reason,
+        created_by: session.user.id,
+        approved_by: session.user.id,
+      })
+      .select()
+      .single()
+
+    if (rjErr || !reversalJournal) {
+      throw new Error(`Gagal membuat jurnal reversal: ${rjErr?.message}`)
+    }
+
+    // 3. Insert reversal lines (debit ↔ credit dibalik dari asli)
+    const reversalLines = originalJournal.lines.map((line: any) => ({
+      journal_id: reversalJournal.id,
+      account_id: line.account_id,
+      debit: line.credit,   // Flip: kredit asli → debit reversal
+      credit: line.debit,   // Flip: debit asli → kredit reversal
+    }))
+
+    const { error: rlErr } = await db.from('journal_lines').insert(reversalLines)
+    if (rlErr) throw new Error(`Gagal insert reversal lines: ${rlErr.message}`)
+
+    // 4. Tandai jurnal asli sebagai is_reversed, referensikan reversal journal
+    const { error: updateJErr } = await db
+      .from('journal_entries')
+      .update({
+        is_reversed: true,
+        reversed_journal_id: reversalJournal.id,
+        cancellation_reason: reason,
+      })
+      .eq('id', originalJournal.id)
+
+    if (updateJErr) throw new Error(`Gagal update jurnal asli: ${updateJErr.message}`)
+
+    // 5. Tandai expense sebagai VOID
+    const { error: voidErr } = await db
+      .from('expenses')
+      .update({ status: 'VOID', updated_at: new Date().toISOString() })
+      .eq('id', expenseId)
+
+    if (voidErr) throw new Error(`Gagal membatalkan expense: ${voidErr.message}`)
+
+    return NextResponse.json({
+      success: true,
+      message: 'Pengeluaran berhasil dibatalkan dengan jurnal reversal.',
+      reversal_journal_id: reversalJournal.id,
+      reversal_reference: reversalRef,
+    })
+  } catch (err: any) {
+    console.error('[API /finance/expenses DELETE]', err)
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
+}
+
