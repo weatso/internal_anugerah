@@ -6,21 +6,25 @@ import { motion } from 'framer-motion'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { TrendingUp, TrendingDown, FileText, FolderKanban, ArrowUpRight, Plus, ArrowLeft, Eye } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { useUser } from '@/components/providers/UserProvider'
 import { formatRupiah, formatDate } from '@/lib/utils'
 import { getEntityAccentColor, getDivisionConfig } from '@/lib/division-config'
 import type { JournalEntry } from '@/types'
 
 const FADE_UP = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0 } }
 
+// PROPS SUDAH DITAMBAHKAN entityId
 interface DivisionCommandCenterProps {
-  /** Jika true: CEO sedang impersonate → tampilkan banner + tombol back */
+  entityId?: string
   isCEOImpersonating?: boolean
 }
 
-export function DivisionCommandCenter({ isCEOImpersonating = false }: DivisionCommandCenterProps) {
-  const { profile, effectiveEntityId, effectiveEntity, isImpersonating, impersonate, highestRole } = useUser()
+// export default function BUKAN export function biasa
+export default function DivisionCommandCenter({ entityId, isCEOImpersonating = false }: DivisionCommandCenterProps) {
   const supabase = createClient()
+
+  // STATE UNTUK MENGGANTIKAN useUser
+  const [profile, setProfile] = useState<any>(null)
+  const [entityData, setEntityData] = useState<any>(null)
 
   const [income, setIncome]   = useState(0)
   const [expense, setExpense] = useState(0)
@@ -30,13 +34,29 @@ export function DivisionCommandCenter({ isCEOImpersonating = false }: DivisionCo
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!effectiveEntityId) return
+    if (!entityId) {
+      // JIKA ENTITY ID KOSONG DARI COOKIE, MATIKAN LOADING AGAR TIDAK HANG
+      setLoading(false)
+      return
+    }
     fetchData()
-  }, [effectiveEntityId])
+  }, [entityId])
 
   async function fetchData() {
     setLoading(true)
     try {
+      // 1. Tarik identitas profil langsung dari API 
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: pData } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+        setProfile(pData)
+      }
+
+      // 2. Tarik nama Divisi
+      const { data: eData } = await supabase.from('entities').select('*').eq('id', entityId).single()
+      setEntityData(eData)
+
+      // 3. Kueri metrik menggunakan entityId
       const [
         { data: journalData },
         { count: invCount },
@@ -45,17 +65,18 @@ export function DivisionCommandCenter({ isCEOImpersonating = false }: DivisionCo
         supabase
           .from('journal_entries')
           .select('*, lines:journal_lines(*, account:chart_of_accounts(*))')
-          .eq('entity_id', effectiveEntityId!)
+          .eq('entity_id', entityId)
           .eq('status', 'APPROVED'),
         supabase
-          .from('invoices')
+          .from('commercial_documents')
           .select('id', { count: 'exact', head: true })
-          .eq('entity_id', effectiveEntityId!)
-          .eq('status', 'PENDING_APPROVAL'),
+          .eq('entity_id', entityId)
+          .eq('status', 'UNPAID')
+          .eq('doc_type', 'INVOICE'),
         supabase
           .from('workspace_logs')
           .select('id', { count: 'exact', head: true })
-          .eq('entity_id', effectiveEntityId!),
+          .eq('entity_id', entityId),
       ])
 
       const journals = (journalData ?? []) as JournalEntry[]
@@ -81,10 +102,10 @@ export function DivisionCommandCenter({ isCEOImpersonating = false }: DivisionCo
     }
   }
 
-  const accentColor = getEntityAccentColor(effectiveEntity)
-  const config      = getDivisionConfig(effectiveEntity?.name)
+  const accentColor = getEntityAccentColor(entityData)
+  const config      = getDivisionConfig(entityData?.name)
   const net         = income - expense
-  const divName     = effectiveEntity?.name ?? profile?.entity?.name ?? 'Divisi'
+  const divName     = entityData?.name ?? 'Divisi'
   const firstName   = profile?.full_name?.split(' ')[0] ?? ''
 
   const barData = [
@@ -93,11 +114,24 @@ export function DivisionCommandCenter({ isCEOImpersonating = false }: DivisionCo
     { name: 'Net', value: Math.abs(net) },
   ]
 
+  // DI SINI TEMPAT KODE YANG ANDA TANYAKAN (Penanganan jika Cookie kosong)
+  if (!entityId && !loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
+        <p className="text-neutral-400 text-sm">Identitas divisi tidak terdeteksi.</p>
+        <p className="text-[10px] uppercase tracking-widest text-[var(--gold)] font-bold">
+          Silakan pilih Kapasitas Kerja pada menu di Sidebar.
+        </p>
+      </div>
+    )
+  }
+
+  // DI SINI RENDER SPINNER LOADING
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin"
-          style={{ borderColor: accentColor, borderTopColor: 'transparent' }} />
+          style={{ borderColor: accentColor || '#D4AF37', borderTopColor: 'transparent' }} />
       </div>
     )
   }
@@ -120,7 +154,10 @@ export function DivisionCommandCenter({ isCEOImpersonating = false }: DivisionCo
             </span>
           </div>
           <button
-            onClick={() => impersonate(null)}
+            onClick={() => {
+              document.cookie = `active_role=CEO; path=/; max-age=86400`
+              window.location.reload()
+            }}
             className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-sm transition-all hover:opacity-80"
             style={{ background: accentColor, color: '#050505' }}
           >
@@ -141,7 +178,7 @@ export function DivisionCommandCenter({ isCEOImpersonating = false }: DivisionCo
             <div className="flex items-center gap-2 mb-1">
               <span className="text-xl">{config.emoji}</span>
               <p className="text-xs uppercase tracking-[0.3em] font-bold" style={{ color: accentColor }}>
-                {divName} · {isCEOImpersonating ? 'HEAD (via CEO)' : (highestRole ?? 'HEAD')}
+                {divName} · {isCEOImpersonating ? 'HEAD (via CEO)' : 'HEAD'}
               </p>
             </div>
             <h1 className="text-2xl md:text-3xl font-black tracking-tight" style={{ color: 'var(--text-primary)' }}>
@@ -204,7 +241,6 @@ export function DivisionCommandCenter({ isCEOImpersonating = false }: DivisionCo
 
         {/* Recent Transactions + Workspace summary */}
         <motion.div variants={FADE_UP} className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Transactions */}
           <div className="lg:col-span-2 glass-card overflow-hidden">
             <div className="flex items-center justify-between px-5 py-3.5" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
               <h2 className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>Transaksi Terbaru</h2>
@@ -236,7 +272,6 @@ export function DivisionCommandCenter({ isCEOImpersonating = false }: DivisionCo
             )}
           </div>
 
-          {/* Workspace Quick */}
           <div className="glass-card p-5 flex flex-col">
             <div className="flex items-center gap-2 mb-4">
               <FolderKanban className="w-4 h-4" style={{ color: accentColor }} />

@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import CEOCommandCenter from './components/CEOCommandCenter'
-import { DivisionCommandCenter } from './components/DivisionCommandCenter'
+import DivisionCommandCenter from './components/DivisionCommandCenter'
 import { StaffWorkspace } from './components/StaffWorkspace'
 
 export default async function DashboardPage() {
@@ -20,7 +20,7 @@ export default async function DashboardPage() {
       {activeRole === 'CEO' && <CEOCommandCenter />}
       
       {(activeRole === 'HEAD' || activeRole === 'FINANCE') && (
-        <DivisionCommandCenter />
+        <DivisionCommandCenter entityId={activeEntityId} />
       )}
       
       {activeRole === 'STAFF' && (
