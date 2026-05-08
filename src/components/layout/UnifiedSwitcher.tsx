@@ -16,7 +16,6 @@ const ROLE_LABEL: Record<string, string> = {
   CEO: 'CEO',
   HEAD: 'Head',
   FINANCE: 'Finance',
-  DESIGN: 'Design',
   STAFF: 'Staff',
 }
 
@@ -24,7 +23,6 @@ const ROLE_COLOR: Record<string, string> = {
   CEO: '#D4AF37',
   HEAD: '#818cf8',
   FINANCE: '#34d399',
-  DESIGN: '#f472b6',
   STAFF: '#94a3b8',
 }
 

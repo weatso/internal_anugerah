@@ -2,7 +2,7 @@ import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import CEOCommandCenter from './components/CEOCommandCenter'
 import DivisionCommandCenter from './components/DivisionCommandCenter'
-import { StaffWorkspace } from './components/StaffWorkspace'
+import StaffWorkspace from './components/StaffWorkspace'
 
 export default async function DashboardPage() {
   const cookieStore = await cookies()
@@ -14,7 +14,6 @@ export default async function DashboardPage() {
 
   if (!user) return null
 
-  // Dashboard berubah berdasarkan role yang ada di COOKIE
   return (
     <div className="p-6 md:p-10 max-w-[1600px] mx-auto">
       {activeRole === 'CEO' && <CEOCommandCenter />}
@@ -24,7 +23,7 @@ export default async function DashboardPage() {
       )}
       
       {activeRole === 'STAFF' && (
-        <StaffWorkspace />
+        <StaffWorkspace userId={user.id} entityId={activeEntityId} />
       )}
     </div>
   )

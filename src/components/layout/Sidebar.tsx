@@ -28,16 +28,16 @@ const FINANCE_ITEMS = [
 ]
 
 const TOP_NAV = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['CEO','FINANCE','HEAD','STAFF','DESIGN'] },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['CEO','FINANCE','HEAD','STAFF'] },
 ]
 
 const BOTTOM_NAV = [
   { href: '/invoicing',   label: 'Komersial',           icon: Receipt,      roles: ['CEO','FINANCE','HEAD'] },
-  { href: '/catalogue',   label: 'Katalog & Portofolio', icon: Tag,          roles: ['CEO','FINANCE','HEAD','STAFF','DESIGN'] },
-  { href: '/workspace',   label: 'Workspace',           icon: FolderKanban, roles: ['CEO','FINANCE','HEAD','STAFF','DESIGN'] },
+  { href: '/catalogue',   label: 'Katalog & Portofolio', icon: Tag,          roles: ['CEO','FINANCE','HEAD','STAFF'] },
+  { href: '/workspace',   label: 'Workspace',           icon: FolderKanban, roles: ['CEO','FINANCE','HEAD','STAFF'] },
   { href: '/clients',     label: 'CRM / Klien',         icon: Briefcase,    roles: ['CEO','FINANCE','HEAD','STAFF'] },
   { href: '/admin',       label: 'Admin Panel',         icon: ShieldCheck,  roles: ['CEO'] },
-  { href: '/settings',    label: 'Settings',            icon: Settings,     roles: ['CEO','FINANCE','HEAD','STAFF','DESIGN'] },
+  { href: '/settings',    label: 'Settings',            icon: Settings,     roles: ['CEO','FINANCE','HEAD','STAFF'] },
 ]
 
 // KITA TAMBAHKAN PROPS activeRole dan activeEntityId DARI SERVER
