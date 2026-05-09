@@ -7,11 +7,13 @@ import { formatRupiah } from '@/lib/utils'
 import { Plus, Trash2, ChevronRight, X, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 
-// 1. DEFINISIKAN INTERFACE UNTUK PROPS
+// 1. UPDATE INTERFACE
 interface Props {
   entityId: string
   entityName: string
   userId: string
+  activeRole: string
+  allEntities: { id: string; name: string }[]
 }
 
 interface LineItem {
@@ -37,8 +39,8 @@ interface Commission {
   commission_amount: number
 }
 
-// 2. MASUKKAN PROPS KE DALAM FUNGSI
-export default function DocumentBuilderPage({ entityId, entityName, userId }: Props) {
+// 2. MASUKKAN PROPS
+export default function DocumentBuilderPage({ entityId, entityName, userId, activeRole, allEntities }: Props) {
   const supabase = createClient()
   const router = useRouter()
 
@@ -48,6 +50,10 @@ export default function DocumentBuilderPage({ entityId, entityName, userId }: Pr
   const [deferredAccountId, setDeferredAccountId] = useState('')
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+
+  // STATE BYPASS CEO
+  const [selectedEntityId, setSelectedEntityId] = useState(entityId)
+  const [selectedEntityName, setSelectedEntityName] = useState(entityName)
 
   const [clientId, setClientId] = useState('')
   const [docType, setDocType] = useState('QUOTATION')
@@ -123,7 +129,6 @@ export default function DocumentBuilderPage({ entityId, entityName, userId }: Pr
   const taxAmount = subtotal * (taxRate / 100)
   const grandTotal = subtotal + taxAmount
 
-  // Recalculate %-based commissions when grandTotal changes
   useEffect(() => {
     setCommissions(prev => prev.map(c =>
       c.is_percentage ? { ...c, commission_amount: Math.round(grandTotal * (c.commission_percentage / 100)) } : c
@@ -134,7 +139,8 @@ export default function DocumentBuilderPage({ entityId, entityName, userId }: Pr
     if (!clientId || !title) { toast.error('Klien dan Judul wajib diisi'); return }
     setSubmitting(true)
     try {
-      const divCode = entityName.substring(0, 3).toUpperCase() || 'AV'
+      // GENERASI KODE OTOMATIS BERDASARKAN ENTITAS YANG DIPILIH
+      const divCode = selectedEntityName.substring(0, 3).toUpperCase() || 'AV'
       const prefixMap: Record<string, string> = {
         QUOTATION: 'QUO', SPK: 'SPK', PROFORMA: 'PRO', INVOICE: 'INV', RECEIPT: 'REC'
       }
@@ -142,7 +148,7 @@ export default function DocumentBuilderPage({ entityId, entityName, userId }: Pr
       const docNumber = `${prefix}/${divCode}/${new Date().getFullYear()}/${Math.floor(1000 + Math.random() * 9000)}`
 
       const { data: doc, error: docErr } = await supabase.from('commercial_documents').insert({
-        entity_id: entityId, // Sudah mengenali dari props
+        entity_id: selectedEntityId, // MENGGUNAKAN ENTITAS PILIHAN
         client_id: clientId,
         doc_type: docType,
         doc_number: docNumber,
@@ -155,10 +161,9 @@ export default function DocumentBuilderPage({ entityId, entityName, userId }: Pr
         status: 'DRAFT',
         issue_date: issueDate,
         due_date: dueDate || null,
-        created_by: userId, // Sudah mengenali dari props
+        created_by: userId,
       }).select().single()
       
-      // ... sisa kode
       if (docErr) throw docErr
 
       if (doc && subtotal > 0) {
@@ -217,14 +222,29 @@ export default function DocumentBuilderPage({ entityId, entityName, userId }: Pr
           <span>Commercial Hub</span><ChevronRight className="w-3 h-3" /><span style={{ color: 'var(--gold)' }}>Document Builder</span>
         </div>
         <h1 className="text-2xl font-black tracking-tight" style={{ color: 'var(--text-primary)' }}>Pembuatan Dokumen Komersial</h1>
-        <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Divisi: <span className="font-bold" style={{ color: 'var(--text-primary)' }}>{entityName || 'Holding'}</span></p>
+        <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Divisi Penerbit: <span className="font-bold" style={{ color: 'var(--text-primary)' }}>{selectedEntityName || 'Memuat...'}</span></p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* LEFT: Meta */}
         <div className="lg:col-span-1 space-y-5">
           <div className="glass-card p-5 space-y-4" style={{ borderTopColor: 'var(--gold)', borderTopWidth: 2 }}>
-            <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--gold)' }}>Relasi Klien</h2>
+            <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--gold)' }}>Identitas Dokumen</h2>
+            
+            {/* OVERRIDE DROPDOWN KHUSUS CEO */}
+            {activeRole === 'CEO' && (
+              <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-md mb-2">
+                <label className="text-[10px] text-red-400 font-bold uppercase tracking-widest block mb-1">CEO Override (Ubah Entitas Penerbit)</label>
+                <select className={`${fieldCls} !bg-black/50 border-red-500/50`} value={selectedEntityId} 
+                  onChange={e => {
+                    setSelectedEntityId(e.target.value)
+                    setSelectedEntityName(allEntities.find(x => x.id === e.target.value)?.name || '')
+                  }}>
+                  {allEntities.map(en => <option key={en.id} value={en.id}>{en.name}</option>)}
+                </select>
+              </div>
+            )}
+
             <div>
               <label className="section-label block mb-1.5">Klien *</label>
               <select className={fieldCls} value={clientId} onChange={e => setClientId(e.target.value)}>
