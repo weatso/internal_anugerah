@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useUser } from '@/components/providers/UserProvider'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Trash2, Loader2, Receipt, AlertTriangle, FileText } from 'lucide-react'
@@ -30,9 +29,9 @@ interface COAccount {
 }
 
 export default function ExpensesPage() {
-  const { profile, effectiveEntityId, loading: userLoading } = useUser()
   const supabase = createClient()
 
+  const [effectiveEntityId, setEffectiveEntityId] = useState<string | null>(null)
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [expenseAccounts, setExpenseAccounts] = useState<COAccount[]>([])
   const [bankAccounts, setBankAccounts] = useState<COAccount[]>([])
@@ -55,17 +54,24 @@ export default function ExpensesPage() {
   })
 
   useEffect(() => {
-    if (!effectiveEntityId || userLoading) return
-    fetchData()
-  }, [effectiveEntityId, userLoading])
+    // BACA COOKIE SECARA LANGSUNG
+    const entityId = document.cookie.match(new RegExp('(^| )active_entity_id=([^;]+)'))?.pop() || null
+    if (entityId) {
+      setEffectiveEntityId(entityId)
+      fetchData(entityId)
+    } else {
+      setLoading(false)
+      toast.error('Kapasitas Kerja belum dipilih. Silakan pilih di Sidebar.')
+    }
+  }, [])
 
-  async function fetchData() {
+  async function fetchData(entityId: string) {
     setLoading(true)
     const [{ data: expData }, { data: coaData }, { data: projData }] = await Promise.all([
       supabase
         .from('expenses')
         .select('*, project:projects(name)')
-        .eq('entity_id', effectiveEntityId!)
+        .eq('entity_id', entityId)
         .order('expense_date', { ascending: false }),
       supabase
         .from('chart_of_accounts')
@@ -75,7 +81,7 @@ export default function ExpensesPage() {
       supabase
         .from('projects')
         .select('id, name')
-        .eq('entity_id', effectiveEntityId!)
+        .eq('entity_id', entityId)
         .eq('status', 'ACTIVE')
         .order('name'),
     ])
@@ -119,7 +125,7 @@ export default function ExpensesPage() {
       toast.success('Pengeluaran berhasil dicatat & jurnal otomatis dibuat.')
       setForm({ description: '', amount: 0, expense_date: new Date().toISOString().slice(0, 10), category: '', expense_account_id: '', bank_account_id: '', project_id: '', proof_url: '' })
       setShowForm(false)
-      fetchData()
+      if (effectiveEntityId) fetchData(effectiveEntityId)
     } catch (err: any) {
       toast.error(err.message)
     } finally {
@@ -139,7 +145,7 @@ export default function ExpensesPage() {
       if (!res.ok) throw new Error(result.error || 'Gagal membatalkan')
 
       toast.success(`Berhasil di-VOID. Jurnal reversal: ${result.reversal_reference}`)
-      fetchData()
+      if (effectiveEntityId) fetchData(effectiveEntityId)
     } catch (err: any) {
       toast.error(err.message)
     } finally {
@@ -152,7 +158,7 @@ export default function ExpensesPage() {
   const voidedExpenses = expenses.filter(e => (e as any).status === 'VOID')
   const totalActive = activeExpenses.reduce((s, e) => s + Number(e.amount), 0)
 
-  if (loading || userLoading) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Loader2 className="w-8 h-8 text-[#D4AF37] animate-spin" />

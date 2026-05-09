@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useUser } from '@/components/providers/UserProvider'
 import { ChartOfAccount, AccountClass, DivisionFinancialSetting, Entity, Stakeholder } from '@/types'
 import { toast } from 'sonner'
 import { Loader2, Landmark, Tags, PiggyBank, Users } from 'lucide-react'
@@ -10,33 +9,36 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 
 export default function MasterDataPage() {
-  const { profile, loading: userLoading, highestRole } = useUser()
   const router = useRouter()
   const supabase = createClient()
 
   const [activeTab, setActiveTab] = useState<'accounts' | 'limit' | 'stakeholders'>('accounts')
+  const [highestRole, setHighestRole] = useState<string | null>(null)
   
   // States
   const [accounts, setAccounts] = useState<ChartOfAccount[]>([])
   const [limits, setLimits] = useState<(DivisionFinancialSetting & { entity?: Entity })[]>([])
   const [stakeholders, setStakeholders] = useState<Stakeholder[]>([])
   
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [formLoading, setFormLoading] = useState(false)
 
-  // Fetch Data
+  // Fetch Data & Validasi Role
   useEffect(() => {
-    if (!userLoading && highestRole !== 'CEO') {
-      toast.error('Akses ditolak.')
+    const role = document.cookie.match(new RegExp('(^| )active_role=([^;]+)'))?.pop()?.toUpperCase() || null
+    setHighestRole(role)
+
+    if (role !== 'CEO') {
+      toast.error('Akses ditolak. Modul ini khusus CEO.')
       router.push('/finance')
       return
     }
 
-    if (highestRole === 'CEO') {
-      fetchMasterData()
-    }
-  }, [profile, userLoading, router])
+    fetchMasterData()
+  }, [router])
 
   async function fetchMasterData() {
+    setLoading(true)
     // Accounts
     const { data: aData } = await supabase.from('chart_of_accounts').select('*').order('account_code', { ascending: true })
     if (aData) setAccounts(aData)
@@ -48,6 +50,8 @@ export default function MasterDataPage() {
     // Stakeholders
     const { data: sData } = await supabase.from('stakeholders').select('*').order('created_at', { ascending: true })
     if (sData) setStakeholders(sData)
+      
+    setLoading(false)
   }
 
   // --- Account Actions ---
@@ -55,20 +59,18 @@ export default function MasterDataPage() {
   
   const handleSaveAccount = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
+    setFormLoading(true)
 
-    // Auto Generate Code Logic
     const prefixMap: Record<AccountClass, string> = {
       'ASSET': '1', 'LIABILITY': '2', 'EQUITY': '3', 'REVENUE': '4', 'COGS': '5', 'EXPENSE': '6'
     }
     const prefix = prefixMap[accForm.account_class]
     
-    // Find highest code in this class
     const classAccounts = accounts.filter(a => a.account_class === accForm.account_class)
     let nextNum = 1000
     if (classAccounts.length > 0) {
       const nums = classAccounts.map(a => parseInt(a.account_code.split('-')[1]))
-      nextNum = Math.max(...nums) + 10 // increment by 10
+      nextNum = Math.max(...nums) + 10 
     }
     
     const generatedCode = `${prefix}-${nextNum}`
@@ -86,7 +88,7 @@ export default function MasterDataPage() {
       setAccForm({ account_class: 'EXPENSE', account_name: '', is_bank: false })
       fetchMasterData() 
     }
-    setLoading(false)
+    setFormLoading(false)
   }
 
   const toggleAccountStatus = async (id: string, currentStatus: boolean) => {
@@ -105,7 +107,7 @@ export default function MasterDataPage() {
   const [stkForm, setStkForm] = useState({ name: '', type: 'INVESTOR' as 'OWNER'|'INVESTOR', equity_percentage: 0, profit_split_percentage: 0 })
   const handleSaveStakeholder = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
+    setFormLoading(true)
     const { error } = await supabase.from('stakeholders').insert([stkForm])
     if (error) toast.error(error.message)
     else { 
@@ -113,10 +115,10 @@ export default function MasterDataPage() {
       setStkForm({ name: '', type: 'INVESTOR', equity_percentage: 0, profit_split_percentage: 0 })
       fetchMasterData() 
     }
-    setLoading(false)
+    setFormLoading(false)
   }
 
-  if (userLoading || highestRole !== 'CEO') {
+  if (loading || highestRole !== 'CEO') {
     return <div className="flex items-center justify-center min-h-[60vh]"><Loader2 className="w-8 h-8 text-[#D4AF37] animate-spin" /></div>
   }
 
@@ -176,7 +178,7 @@ export default function MasterDataPage() {
                   <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-md mt-2">
                     <p className="text-[10px] text-blue-400 leading-relaxed">Sistem akan secara otomatis me-<i>generate</i> Kode KAP sesuai urutan kelas tanpa perlu input manual.</p>
                   </div>
-                  <button type="submit" disabled={loading} className="w-full bg-white/10 hover:bg-[#D4AF37]/20 text-[--color-text-primary] font-bold py-2.5 rounded-md transition-all text-xs uppercase tracking-widest mt-2">{loading ? 'Saving...' : 'Buat Akun'}</button>
+                  <button type="submit" disabled={formLoading} className="w-full bg-white/10 hover:bg-[#D4AF37]/20 text-[--color-text-primary] font-bold py-2.5 rounded-md transition-all text-xs uppercase tracking-widest mt-2">{formLoading ? 'Saving...' : 'Buat Akun'}</button>
                 </form>
               </div>
             </div>
@@ -234,7 +236,7 @@ export default function MasterDataPage() {
                     <label className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Persentase Profit Split %</label>
                     <input type="number" step="0.01" min="0" max="100" required value={stkForm.profit_split_percentage} onChange={e=>setStkForm({...stkForm, profit_split_percentage: parseFloat(e.target.value)})} className="w-full bg-black/50 border border-white/10 rounded-md px-3 py-2 text-sm text-[--color-text-primary] mt-1 focus:border-[#D4AF37]/50" />
                   </div>
-                  <button type="submit" disabled={loading} className="w-full bg-white/10 hover:bg-[#D4AF37]/20 text-[--color-text-primary] font-bold py-2.5 rounded-md transition-all text-xs uppercase tracking-widest mt-2">{loading ? 'Saving...' : 'Simpan Stakeholder'}</button>
+                  <button type="submit" disabled={formLoading} className="w-full bg-white/10 hover:bg-[#D4AF37]/20 text-[--color-text-primary] font-bold py-2.5 rounded-md transition-all text-xs uppercase tracking-widest mt-2">{formLoading ? 'Saving...' : 'Simpan Stakeholder'}</button>
                 </form>
               </div>
             </div>

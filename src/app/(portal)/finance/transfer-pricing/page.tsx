@@ -2,16 +2,18 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useUser } from '@/components/providers/UserProvider'
 import { formatRupiah, formatDate, getStatusColor, getStatusLabel, cn } from '@/lib/utils'
 import { Plus, CheckCircle, Loader2, ArrowRight, X } from 'lucide-react'
 import type { Entity, InternalBilling, ChartOfAccount } from '@/types'
 import { toast } from 'sonner'
 
 export default function TransferPricingPage() {
-  const { profile, highestRole } = useUser()
   const supabase = createClient()
   
+  const [highestRole, setHighestRole] = useState<string | null>(null)
+  const [activeEntityId, setActiveEntityId] = useState<string | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
+
   const [billings, setBillings] = useState<InternalBilling[]>([])
   const [entities, setEntities] = useState<Entity[]>([])
   const [expenseAccounts, setExpenseAccounts] = useState<ChartOfAccount[]>([])
@@ -26,8 +28,31 @@ export default function TransferPricingPage() {
 
   // Form
   const [allocations, setAllocations] = useState<{ entity_id: string; amount: string; description: string }[]>([])
+  const [formFromEntity, setFormFromEntity] = useState<string>('')
+  const [formRevenueAcc, setFormRevenueAcc] = useState<string>('')
 
-  async function fetchData() {
+  useEffect(() => {
+    async function init() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) setUserId(user.id)
+      
+      const role = document.cookie.match(new RegExp('(^| )active_role=([^;]+)'))?.pop()?.toUpperCase() || null
+      const entityId = document.cookie.match(new RegExp('(^| )active_entity_id=([^;]+)'))?.pop() || null
+      
+      setHighestRole(role)
+      setActiveEntityId(entityId)
+      
+      if (role) {
+        if (role === 'HEAD' && entityId) setFormFromEntity(entityId)
+        fetchData(role, entityId)
+      } else {
+        setLoading(false)
+      }
+    }
+    init()
+  }, [])
+
+  async function fetchData(role: string, entityId: string | null) {
     setLoading(true)
     const [{ data: b }, { data: e }, { data: accs }] = await Promise.all([
       supabase.from('internal_billings').select('*, from_entity_data:entities!internal_billings_from_entity_id_fkey(id,name,type), to_entity_data:entities!internal_billings_to_entity_id_fkey(id,name,type)').order('created_at', { ascending: false }),
@@ -37,9 +62,9 @@ export default function TransferPricingPage() {
     
     // Filter billings based on role
     let filteredBillings = (b || []) as InternalBilling[]
-    if (highestRole === 'HEAD') {
-      filteredBillings = filteredBillings.filter(x => x.to_entity_id === profile?.entity_id || x.from_entity_id === profile?.entity_id)
-    } else if (highestRole !== 'CEO' && highestRole !== 'FINANCE') {
+    if (role === 'HEAD') {
+      filteredBillings = filteredBillings.filter(x => x.to_entity_id === entityId || x.from_entity_id === entityId)
+    } else if (role !== 'CEO' && role !== 'FINANCE') {
       filteredBillings = []
     }
 
@@ -50,25 +75,13 @@ export default function TransferPricingPage() {
     setLoading(false)
   }
 
-  useEffect(() => { if (profile) fetchData() }, [profile])
-
   function addAllocation() {
     setAllocations(a => [...a, { entity_id: '', amount: '', description: '' }])
   }
 
-  const [formFromEntity, setFormFromEntity] = useState<string>('')
-  const [formRevenueAcc, setFormRevenueAcc] = useState<string>('')
-
-  // Init form defaults
-  useEffect(() => {
-    if (highestRole === 'HEAD' && profile?.entity_id) {
-      setFormFromEntity(profile.entity_id)
-    }
-  }, [profile])
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!profile) return
+    if (!userId) return
     if (!formFromEntity) return toast.error('Pilih Divisi Penagih')
     setSubmitting(true)
 
@@ -78,7 +91,7 @@ export default function TransferPricingPage() {
       amount: Number(a.amount.replace(/\D/g, '')),
       status: 'PENDING_APPROVAL',
       description: a.description || 'Transfer Pricing',
-      created_by: profile.id,
+      created_by: userId,
       revenue_account_id: formRevenueAcc || null
     }))
 
@@ -95,7 +108,7 @@ export default function TransferPricingPage() {
       toast.success('Tagihan antar divisi berhasil dibuat')
       setShowForm(false)
       setAllocations([])
-      fetchData()
+      if (highestRole) fetchData(highestRole, activeEntityId)
     }
     setSubmitting(false)
   }
@@ -117,7 +130,7 @@ export default function TransferPricingPage() {
       if (!res.ok) throw new Error(result.error)
       
       toast.success('Transfer Pricing telah di-approve dan Jurnal Beban tercatat.')
-      fetchData()
+      if (highestRole) fetchData(highestRole, activeEntityId)
     } catch (err: any) {
       toast.error(err.message)
     } finally {
@@ -173,7 +186,7 @@ export default function TransferPricingPage() {
                     {b.status.replace('_', ' ')}
                   </span>
                   
-                  {b.status === 'PENDING_APPROVAL' && (highestRole === 'CEO' || (highestRole === 'HEAD' && profile?.entity_id === b.to_entity_id)) && (
+                  {b.status === 'PENDING_APPROVAL' && (highestRole === 'CEO' || (highestRole === 'HEAD' && activeEntityId === b.to_entity_id)) && (
                     <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2 mt-2">
                       <select value={selectedExpenseCategory} onChange={e => setSelectedExpenseCategory(e.target.value)}
                         className="bg-black/50 border border-white/10 rounded-md px-3 py-2 text-[--color-text-primary] text-xs focus:border-[#D4AF37]/50 w-full lg:w-48">
