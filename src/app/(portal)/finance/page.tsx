@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers'
 import Link from 'next/link'
-import { BookOpen, Layers, ArrowLeftRight, DollarSign, PieChart, BarChart3 } from 'lucide-react'
+import { BookOpen, Layers, ArrowLeftRight, DollarSign, PieChart, BarChart3, Receipt } from 'lucide-react'
 
 // Definisi Modul tersentralisasi dengan filter otorisasi
 const FINANCE_MODULES = [
@@ -10,6 +10,20 @@ const FINANCE_MODULES = [
     description: 'Pusat pencatatan jurnal transaksi harian secara double-entry untuk menjaga keseimbangan neraca.', 
     icon: BookOpen, 
     roles: ['CEO','FINANCE','HEAD','STAFF'] 
+  },
+  { 
+    href: '/finance/expenses', 
+    label: 'Biaya & Pengeluaran', 
+    description: 'Pencatatan setiap pengeluaran operasional (OPEX/COGS) agar Laporan Laba Rugi akurat.', 
+    icon: Receipt, 
+    roles: ['CEO','FINANCE','HEAD'] 
+  },
+  { 
+    href: '/finance/reports', 
+    label: 'Laporan P&L', 
+    description: 'Pantauan metrik finansial, Laba Rugi (PnL), dan arus kas divisi.', 
+    icon: BarChart3, 
+    roles: ['CEO','FINANCE','HEAD'] 
   },
   { 
     href: '/finance/master-data', 
@@ -45,13 +59,6 @@ const FINANCE_MODULES = [
     description: 'Distribusi Laba Bersih kepada Partner Operasional dan Pemegang Saham.', 
     icon: PieChart, 
     roles: ['CEO'] 
-  },
-  { 
-    href: '/finance/reports', 
-    label: 'Laporan Keuangan', 
-    description: 'Pantauan metrik finansial, Laba Rugi (PnL), dan arus kas divisi.', 
-    icon: BarChart3, 
-    roles: ['CEO','FINANCE'] 
   },
 ]
 

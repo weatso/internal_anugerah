@@ -91,7 +91,10 @@ export function UnifiedSwitcher({
     document.cookie = `active_role=${cap.role}; path=/; max-age=86400`
     document.cookie = `active_entity_id=${cap.entity_id}; path=/; max-age=86400`
     setOpen(false)
-    router.refresh()
+    // Hard reload diperlukan agar Server Components (layout, page.tsx wrapper)
+    // membaca cookie baru. router.refresh() tidak cukup karena cookie baru
+    // belum terbaca oleh middleware dan Server Components secara konsisten.
+    window.location.reload()
   }
 
   const accentColor = ROLE_COLOR[activeRole] ?? '#D4AF37'

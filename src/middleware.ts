@@ -67,21 +67,23 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // PROTEKSI MODUL FINANCE (HANYA CEO, HEAD, FINANCE)
+  // PROTEKSI SPESIFIK: MODUL FINANCE TINGKAT DEWA (HANYA CEO SECARA MUTLAK)
+  // ⚠️ URUTAN PENTING: Cek ini harus SEBELUM cek umum /finance
+  const ceoOnlyFinanceRoutes = ['/finance/dividends', '/finance/transfer-pricing', '/finance/master-data', '/finance/commissions']
+  if (ceoOnlyFinanceRoutes.some(r => path.startsWith(r)) && activeRole !== 'CEO') {
+    url.pathname = '/finance'
+    return NextResponse.redirect(url)
+  }
+
+  // PROTEKSI MODUL FINANCE UMUM (CEO, HEAD, FINANCE)
   if (path.startsWith('/finance') && !['CEO', 'HEAD', 'FINANCE'].includes(activeRole || '')) {
     url.pathname = '/dashboard'
     return NextResponse.redirect(url)
   }
 
-  // PROTEKSI MODUL INVOICING/KOMERSIAL (HANYA CEO, HEAD, FINANCE)
+  // PROTEKSI MODUL INVOICING/KOMERSIAL (CEO, HEAD, FINANCE)
   if (path.startsWith('/invoicing') && !['CEO', 'HEAD', 'FINANCE'].includes(activeRole || '')) {
     url.pathname = '/dashboard'
-    return NextResponse.redirect(url)
-  }
-
-  // PROTEKSI SPESIFIK: DIVIDEN & TRANSFER PRICING (HANYA CEO SECARA MUTLAK)
-  if ((path.startsWith('/finance/dividends') || path.startsWith('/finance/transfer-pricing')) && activeRole !== 'CEO') {
-    url.pathname = '/finance' // Lempar kembali ke induk finance
     return NextResponse.redirect(url)
   }
 

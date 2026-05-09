@@ -90,7 +90,35 @@ export async function POST(request: Request) {
       }
     }
 
-    // ── 5. DOUBLE-ENTRY: TENTUKAN DEBIT & KREDIT ──────────────────────────
+    // ── 5. VALIDASI AKUN COA SEBELUM JURNAL ──────────────────────────────
+    // Pastikan kedua akun ada di master data agar tidak error PGRST116
+    const { data: bankAccount, error: bankErr } = await db
+      .from('chart_of_accounts')
+      .select('id, account_name')
+      .eq('id', bank_account_id)
+      .eq('is_active', true)
+      .single()
+
+    if (bankErr || !bankAccount) {
+      return NextResponse.json({
+        error: 'Gagal: Akun bank/rekening tidak ditemukan di Master COA. Pastikan akun sudah terdaftar dan aktif.'
+      }, { status: 400 })
+    }
+
+    const { data: categoryAccount, error: catErr } = await db
+      .from('chart_of_accounts')
+      .select('id, account_name')
+      .eq('id', category_id)
+      .eq('is_active', true)
+      .single()
+
+    if (catErr || !categoryAccount) {
+      return NextResponse.json({
+        error: 'Gagal: Akun kategori tidak ditemukan di Master COA. Pastikan akun sudah terdaftar dan aktif.'
+      }, { status: 400 })
+    }
+
+    // ── 6. DOUBLE-ENTRY: TENTUKAN DEBIT & KREDIT ──────────────────────────
     let debitAccountId: string
     let creditAccountId: string
 
@@ -147,6 +175,21 @@ export async function POST(request: Request) {
 
   } catch (error: any) {
     console.error('[API /finance/transaction]', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+
+    // Tangkap error Supabase/Postgres umum dan berikan pesan manusiawi
+    const msg = error?.message || 'Terjadi kesalahan tidak terduga'
+    const code = error?.code || ''
+
+    if (code === 'PGRST116') {
+      return NextResponse.json({ error: 'Gagal: Akun kategori tidak ditemukan di Master COA. Pastikan data sudah diisi di Master Data.' }, { status: 400 })
+    }
+    if (code === '23503') {
+      return NextResponse.json({ error: 'Gagal: Referensi data tidak valid. Pastikan semua ID akun dan entitas benar.' }, { status: 400 })
+    }
+    if (code === '23505') {
+      return NextResponse.json({ error: 'Gagal: Nomor referensi jurnal duplikat. Silakan coba lagi.' }, { status: 409 })
+    }
+
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
