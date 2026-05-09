@@ -5,38 +5,17 @@ import { cookies } from 'next/headers'
 
 export async function POST(request: Request) {
   try {
-    // ── 1. VERIFIKASI SESI ────────────────────────────────────────────────
+    // ── 1. VERIFIKASI SESI (ZERO-TRUST: getUser, bukan getSession) ──────────
     const cookieStore = await cookies()
     const supabaseAuth = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       { cookies: { getAll() { return cookieStore.getAll() } } }
     )
-    const { data: { session } } = await supabaseAuth.auth.getSession()
-    if (!session) return NextResponse.json({ error: 'Unauthorized: Missing Session' }, { status: 401 })
+    const { data: { user } } = await supabaseAuth.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Akses Ditolak: Sesi tidak valid atau telah berakhir.' }, { status: 401 })
 
-    // ── 2. VERIFIKASI PROFIL & OTORITAS ────────────────────────────────────
-    const { data: profile } = await supabaseAuth
-      .from('profiles')
-      .select('*, user_roles(role, entity_id)')
-      .eq('id', session.user.id)
-      .single()
-
-    if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
-
-    // Tentukan highest role dari profiles.roles (legacy) atau user_roles (baru)
-    const legacyRoles: string[] = profile.roles || []
-    const assignedRoles: string[] = (profile.user_roles || []).map((r: any) => r.role)
-    const allRoles = [...new Set([...legacyRoles, ...assignedRoles])]
-    const isCEO = allRoles.includes('CEO')
-    const isFinance = allRoles.includes('FINANCE')
-    const isHead = allRoles.includes('HEAD')
-
-    if (!isCEO && !isFinance && !isHead) {
-      return NextResponse.json({ error: 'Forbidden: Insufficient Privileges' }, { status: 403 })
-    }
-
-    // ── 3. PARSE PAYLOAD ───────────────────────────────────────────────────
+    // ── 2. PARSE PAYLOAD ─────────────────────────────────────────────────
     const body = await request.json()
     const { type, amount, bank_account_id, category_id, description, transaction_date, proof_storage_key, entity_id } = body
 
@@ -47,23 +26,51 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid transaction type. Use INCOME or EXPENSE.' }, { status: 400 })
     }
 
-    // Entity: gunakan entity_id dari payload (CEO bisa pilih), atau fallback ke entity user
-    const targetEntityId = entity_id || profile.entity_id ||
-      (profile.user_roles?.[0]?.entity_id ?? null)
+    // Entity: gunakan entity_id dari payload, atau fallback
+    const { data: userProfile } = await supabaseAuth
+      .from('profiles')
+      .select('entity_id')
+      .eq('id', user.id)
+      .single()
 
-    // ── 4. TENTUKAN STATUS APPROVAL ────────────────────────────────────────
+    const targetEntityId = entity_id || userProfile?.entity_id || null
+    if (!targetEntityId) {
+      return NextResponse.json({ error: 'Entity ID tidak ditemukan. Pilih divisi terlebih dahulu.' }, { status: 400 })
+    }
+
+    // ── 3. ZERO-TRUST: VERIFIKASI ROLE DARI DATABASE ───────────────────────
+    //    Jangan percaya cookie. Cek apakah user benar-benar punya role yang sah.
     const db = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
+    const { data: verifiedRoles } = await db
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('entity_id', targetEntityId)
+
+    const userRoles = (verifiedRoles || []).map((r: any) => r.role)
+    const isCEO = userRoles.includes('CEO')
+    const isFinance = userRoles.includes('FINANCE')
+    const isHead = userRoles.includes('HEAD')
+
+    if (!isCEO && !isFinance && !isHead) {
+      return NextResponse.json(
+        { error: 'Manipulasi Terdeteksi: Anda tidak memiliki otoritas pada entitas ini.' },
+        { status: 403 }
+      )
+    }
+
+    // ── 4. TENTUKAN STATUS APPROVAL ────────────────────────────────────────
     let finalStatus = 'PENDING_APPROVAL'
     let approvedBy: string | null = null
 
     if (isCEO || isFinance) {
       finalStatus = 'APPROVED'
-      approvedBy = session.user.id
+      approvedBy = user.id
     } else if (isHead && type === 'EXPENSE') {
       // Head: cek limit divisi
       const { data: divSetting } = await db
@@ -81,7 +88,7 @@ export async function POST(request: Request) {
         }
         if ((Number(usage) + Number(amount)) <= Number(divSetting.monthly_auto_approve_limit)) {
           finalStatus = 'APPROVED'
-          approvedBy = session.user.id
+          approvedBy = user.id
           await db.from('division_financial_settings').update({
             current_month_usage: Number(usage) + Number(amount),
             last_reset_month: now.toISOString(),
@@ -140,7 +147,7 @@ export async function POST(request: Request) {
       description,
       proof_storage_key: proof_storage_key || null,
       status: finalStatus,
-      created_by: session.user.id,
+      created_by: user.id,
       approved_by: approvedBy,
     }).select().single()
 

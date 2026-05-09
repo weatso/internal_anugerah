@@ -17,14 +17,29 @@ export async function POST(req: Request) {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       { cookies: { getAll() { return cookieStore.getAll() } } }
     )
-    const { data: { session } } = await supabaseAuth.auth.getSession()
-    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { data: { user } } = await supabaseAuth.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Akses Ditolak: Sesi tidak valid atau telah berakhir.' }, { status: 401 })
 
-    const { data: profile } = await supabaseAuth.from('profiles').select('roles').eq('id', session.user.id).single()
-    if (!profile?.roles?.includes('CEO')) return NextResponse.json({ error: 'Forbidden: CEO only' }, { status: 403 })
-
-    const { entity_id, period_month, bank_account_id, distribution_type = 'DIVIDEND' } = await req.json()
+    const body = await req.json()
+    const { entity_id, period_month, bank_account_id, distribution_type = 'DIVIDEND' } = body
     const db = admin()
+
+    // ── ZERO-TRUST: VERIFIKASI CEO DARI DATABASE ──────────────────────────
+    // Dividen/Profit Split HANYA boleh CEO. Jangan percaya cookie.
+    const { data: verifiedRole } = await db
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'CEO')
+      .limit(1)
+      .single()
+
+    if (!verifiedRole) {
+      return NextResponse.json(
+        { error: 'Manipulasi Terdeteksi: Hanya CEO yang berhak mendistribusikan dividen.' },
+        { status: 403 }
+      )
+    }
 
     // Hitung Net Profit
     const [year, month] = period_month.split('-').map(Number)
@@ -75,8 +90,8 @@ export async function POST(req: Request) {
       description: `${distribution_type === 'PROFIT_SPLIT' ? 'Profit Split Mitra' : 'Dividen Pemegang Saham'} — Periode ${period_month}`,
       entity_id,
       status: 'APPROVED',
-      created_by: session.user.id,
-      approved_by: session.user.id,
+      created_by: user.id,
+      approved_by: user.id,
     }).select().single()
     if (jErr || !journal) throw new Error(`Gagal membuat journal: ${jErr?.message}`)
 

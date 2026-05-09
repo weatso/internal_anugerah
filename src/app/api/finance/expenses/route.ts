@@ -17,16 +17,34 @@ export async function POST(req: Request) {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       { cookies: { getAll() { return cookieStore.getAll() } } }
     )
-    const { data: { session } } = await supabaseAuth.auth.getSession()
-    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { data: { user } } = await supabaseAuth.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Akses Ditolak: Sesi tidak valid atau telah berakhir.' }, { status: 401 })
 
-    const { entity_id, project_id, expense_date, amount, description, category, proof_url, expense_account_id, bank_account_id } = await req.json()
+    const body = await req.json()
+    const { entity_id, project_id, expense_date, amount, description, category, proof_url, expense_account_id, bank_account_id } = body
 
     if (!entity_id || !amount || !description || !expense_account_id || !bank_account_id) {
       return NextResponse.json({ error: 'Data wajib (entitas, nominal, deskripsi, akun beban, akun bank) tidak lengkap' }, { status: 400 })
     }
 
+    // ── ZERO-TRUST: VERIFIKASI ROLE DARI DATABASE ──────────────────────────
+    // Jangan percaya cookie. Cek apakah user benar-benar punya role yang sah untuk entitas ini.
     const db = admin()
+    const { data: verifiedRole } = await db
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('entity_id', entity_id)
+      .in('role', ['CEO', 'HEAD', 'FINANCE'])
+      .limit(1)
+      .single()
+
+    if (!verifiedRole) {
+      return NextResponse.json(
+        { error: 'Manipulasi Terdeteksi: Anda tidak memiliki otoritas untuk mencatat pengeluaran pada entitas ini.' },
+        { status: 403 }
+      )
+    }
 
     // 1. Buat Journal Entry (Double-Entry)
     const refNum = `EXP/${new Date().getFullYear()}/${Math.floor(1000 + Math.random() * 9000)}`
@@ -36,8 +54,8 @@ export async function POST(req: Request) {
       description: `Pengeluaran: ${description}`,
       entity_id,
       status: 'APPROVED',
-      created_by: session.user.id,
-      approved_by: session.user.id
+      created_by: user.id,
+      approved_by: user.id
     }).select().single()
     
     if (jErr || !journal) throw new Error(`Gagal membuat jurnal: ${jErr?.message}`)
@@ -60,7 +78,7 @@ export async function POST(req: Request) {
       category,
       proof_url,
       journal_id: journal.id,
-      created_by: session.user.id
+      created_by: user.id
     }).select().single()
 
     if (expErr) throw new Error(`Gagal mencatat pengeluaran: ${expErr.message}`)
@@ -90,8 +108,8 @@ export async function DELETE(req: Request) {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       { cookies: { getAll() { return cookieStore.getAll() } } }
     )
-    const { data: { session } } = await supabaseAuth.auth.getSession()
-    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { data: { user } } = await supabaseAuth.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Akses Ditolak: Sesi tidak valid atau telah berakhir.' }, { status: 401 })
 
     const { searchParams } = new URL(req.url)
     const expenseId = searchParams.get('id')
@@ -112,6 +130,24 @@ export async function DELETE(req: Request) {
 
     if (expFetchErr || !expense) {
       return NextResponse.json({ error: 'Pengeluaran tidak ditemukan' }, { status: 404 })
+    }
+
+    // ── ZERO-TRUST: VERIFIKASI ROLE DARI DATABASE ──────────────────────────
+    const expenseEntityId = (expense as any).entity_id
+    const { data: verifiedRole } = await db
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('entity_id', expenseEntityId)
+      .in('role', ['CEO', 'HEAD', 'FINANCE'])
+      .limit(1)
+      .single()
+
+    if (!verifiedRole) {
+      return NextResponse.json(
+        { error: 'Manipulasi Terdeteksi: Anda tidak memiliki otoritas untuk membatalkan pengeluaran pada entitas ini.' },
+        { status: 403 }
+      )
     }
 
     if ((expense as any).status === 'VOID') {
@@ -138,8 +174,8 @@ export async function DELETE(req: Request) {
         entity_id: originalJournal.entity_id,
         status: 'APPROVED',
         cancellation_reason: reason,
-        created_by: session.user.id,
-        approved_by: session.user.id,
+        created_by: user.id,
+        approved_by: user.id,
       })
       .select()
       .single()

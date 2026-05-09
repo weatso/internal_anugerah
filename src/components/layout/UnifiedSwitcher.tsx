@@ -88,13 +88,13 @@ export function UnifiedSwitcher({
   }, [open])
 
   function switchCapacity(cap: Capacity) {
-    document.cookie = `active_role=${cap.role}; path=/; max-age=86400`
-    document.cookie = `active_entity_id=${cap.entity_id}; path=/; max-age=86400`
+    // SameSite=Lax mencegah cookie dikirim oleh request cross-site (CSRF mitigation)
+    document.cookie = `active_role=${cap.role}; path=/; max-age=86400; SameSite=Lax`
+    document.cookie = `active_entity_id=${cap.entity_id}; path=/; max-age=86400; SameSite=Lax`
     setOpen(false)
-    // Hard reload diperlukan agar Server Components (layout, page.tsx wrapper)
-    // membaca cookie baru. router.refresh() tidak cukup karena cookie baru
-    // belum terbaca oleh middleware dan Server Components secara konsisten.
-    window.location.reload()
+    // Hard navigation ke /dashboard agar seluruh Server Components, middleware,
+    // dan layout membaca cookie baru secara konsisten.
+    window.location.href = '/dashboard'
   }
 
   const accentColor = ROLE_COLOR[activeRole] ?? '#D4AF37'
