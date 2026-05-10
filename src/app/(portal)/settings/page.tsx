@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useUser } from '@/components/providers/UserProvider'
 import { toast } from 'sonner'
 import { 
   Lock, 
@@ -12,36 +11,69 @@ import {
   User,
   KeyRound,
   UploadCloud,
-  Image as ImageIcon
+  CreditCard,
+  Building
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 export default function SettingsPage() {
-  const { profile, loading: userLoading } = useUser()
-  const [loading, setLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState<'profile' | 'security'>('profile')
   const supabase = createClient()
+  const [loading, setLoading] = useState(false)
+  const [pageLoading, setPageLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'bank'>('profile')
+
+  const [userId, setUserId] = useState<string | null>(null)
+  const [email, setEmail] = useState('')
+  const [roles, setRoles] = useState<string[]>([])
 
   const [profileForm, setProfileForm] = useState({
     full_name: '',
-    avatar_url: ''
+    avatar_url: '',
+    bank_name: '',
+    bank_account_number: '',
+    bank_account_holder: ''
   })
+  
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    if (profile) {
-      setProfileForm({
-        full_name: profile.full_name || '',
-        avatar_url: profile.avatar_url || ''
-      })
-    }
-  }, [profile])
 
   const [passwordForm, setPasswordForm] = useState({
     newPassword: '',
     confirmPassword: ''
   })
+
+  // 1. GANTIKAN useUser DENGAN FETCH MANDIRI
+  useEffect(() => {
+    async function fetchProfile() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        setPageLoading(false)
+        return
+      }
+
+      setUserId(user.id)
+      setEmail(user.email || '')
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+
+      if (profile) {
+        setProfileForm({
+          full_name: profile.full_name || '',
+          avatar_url: profile.avatar_url || '',
+          bank_name: profile.bank_name || '',
+          bank_account_number: profile.bank_account_number || '',
+          bank_account_holder: profile.bank_account_holder || ''
+        })
+        setRoles(profile.roles || [])
+      }
+      setPageLoading(false)
+    }
+    fetchProfile()
+  }, [])
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -64,11 +96,15 @@ export default function SettingsPage() {
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!userId) return
     setLoading(true)
     const { error } = await supabase.from('profiles').update({
       full_name: profileForm.full_name,
-      avatar_url: profileForm.avatar_url
-    }).eq('id', profile?.id)
+      avatar_url: profileForm.avatar_url,
+      bank_name: profileForm.bank_name,
+      bank_account_number: profileForm.bank_account_number,
+      bank_account_holder: profileForm.bank_account_holder
+    }).eq('id', userId)
     
     if (error) {
       toast.error(error.message)
@@ -88,7 +124,7 @@ export default function SettingsPage() {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('folder', 'avatars')
-    formData.append('entity_id', profile?.id || 'general')
+    formData.append('entity_id', userId || 'general')
 
     try {
       const res = await fetch('/api/storage/upload', {
@@ -107,7 +143,7 @@ export default function SettingsPage() {
     }
   }
 
-  if (userLoading) {
+  if (pageLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Loader2 className="w-8 h-8 text-[#D4AF37] animate-spin" />
@@ -117,6 +153,7 @@ export default function SettingsPage() {
 
   const navItems = [
     { id: 'profile', label: 'Profil Pengguna', icon: User },
+    { id: 'bank', label: 'Rekening Komisi', icon: CreditCard },
     { id: 'security', label: 'Keamanan Akun', icon: Lock }
   ]
 
@@ -155,19 +192,29 @@ export default function SettingsPage() {
               </button>
             ))}
           </nav>
+
+          {/* Read Only Stats */}
+          <div className="mt-8 px-4 py-5 rounded-xl border border-white/5 bg-white/[0.01]">
+             <div className="flex items-center gap-2 text-[--color-text-muted] mb-3">
+                <Building className="w-4 h-4" />
+                <span className="text-[10px] uppercase tracking-widest font-bold">Status Otoritas</span>
+             </div>
+             <p className="text-[10px] text-[--color-text-muted] truncate mb-2">{email}</p>
+             <div className="flex flex-wrap gap-1.5">
+                {roles.map(r => (
+                  <span key={r} className="text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20">
+                    {r}
+                  </span>
+                ))}
+             </div>
+          </div>
         </aside>
 
         {/* CONTENT AREA */}
         <main className="flex-1 min-w-0">
           <AnimatePresence mode="wait">
             {activeTab === 'profile' && (
-              <motion.div
-                key="profile"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="glass-card border border-white/5 overflow-hidden"
-              >
+              <motion.div key="profile" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="glass-card border border-white/5 overflow-hidden">
                 <div className="p-6 border-b border-white/5 bg-white/[0.02]">
                   <div className="flex items-center gap-3">
                     <div className="p-2 rounded-lg bg-[#C5A028]/10 text-[#C5A028]">
@@ -234,16 +281,55 @@ export default function SettingsPage() {
                           />
                         </div>
                       </div>
-
                     </div>
 
-                    <button 
-                      type="submit" 
-                      disabled={loading || uploadingAvatar} 
-                      className="inline-flex items-center justify-center gap-2 bg-[#D4AF37] hover:bg-[#B8962E] text-black text-[11px] font-bold px-6 py-3 rounded-lg transition-all uppercase tracking-widest disabled:opacity-50 shadow-lg shadow-[#D4AF37]/10"
-                    >
-                      {loading && <Loader2 className="w-3 h-3 animate-spin" />}
-                      Simpan Profil
+                    <button type="submit" disabled={loading || uploadingAvatar} className="inline-flex items-center justify-center gap-2 bg-[#D4AF37] hover:bg-[#B8962E] text-black text-[11px] font-bold px-6 py-3 rounded-lg transition-all uppercase tracking-widest disabled:opacity-50 shadow-lg shadow-[#D4AF37]/10">
+                      {loading && <Loader2 className="w-3 h-3 animate-spin" />} Simpan Profil
+                    </button>
+                  </form>
+                </div>
+              </motion.div>
+            )}
+
+            {/* TAB REKENING BANK BARU */}
+            {activeTab === 'bank' && (
+              <motion.div key="bank" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="glass-card border border-white/5 overflow-hidden">
+                <div className="p-6 border-b border-white/5 bg-white/[0.02]">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
+                      <CreditCard className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold text-[--color-text-primary]">Rekening Pencairan</h2>
+                      <p className="text-xs text-[--color-text-muted]">Data rekening untuk menerima komisi atau dividen</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="p-8">
+                  <form onSubmit={handleUpdateProfile} className="max-w-md space-y-6">
+                    <div className="space-y-4">
+                      <div className="relative">
+                        <label className="block text-[10px] font-bold text-[--color-text-muted] uppercase tracking-widest mb-1.5 ml-1">Nama Bank</label>
+                        <input type="text" className="w-full bg-[--color-bg-elevated] border border-[--color-border] rounded-lg px-4 py-2.5 text-sm text-[--color-text-primary] focus:border-[#D4AF37]/50 focus:ring-1 focus:ring-[#D4AF37]/20 focus:outline-none transition-all"
+                          value={profileForm.bank_name} onChange={e => setProfileForm({...profileForm, bank_name: e.target.value})} placeholder="Contoh: BCA / Bank Mandiri" />
+                      </div>
+
+                      <div className="relative">
+                        <label className="block text-[10px] font-bold text-[--color-text-muted] uppercase tracking-widest mb-1.5 ml-1">Nomor Rekening</label>
+                        <input type="text" className="w-full bg-[--color-bg-elevated] border border-[--color-border] rounded-lg px-4 py-2.5 text-sm text-[--color-text-primary] font-mono focus:border-[#D4AF37]/50 focus:ring-1 focus:ring-[#D4AF37]/20 focus:outline-none transition-all"
+                          value={profileForm.bank_account_number} onChange={e => setProfileForm({...profileForm, bank_account_number: e.target.value.replace(/\D/g, '')})} placeholder="1234567890" />
+                      </div>
+
+                      <div className="relative">
+                        <label className="block text-[10px] font-bold text-[--color-text-muted] uppercase tracking-widest mb-1.5 ml-1">Nama Pemilik Rekening</label>
+                        <input type="text" className="w-full bg-[--color-bg-elevated] border border-[--color-border] rounded-lg px-4 py-2.5 text-sm text-[--color-text-primary] focus:border-[#D4AF37]/50 focus:ring-1 focus:ring-[#D4AF37]/20 focus:outline-none transition-all"
+                          value={profileForm.bank_account_holder} onChange={e => setProfileForm({...profileForm, bank_account_holder: e.target.value})} placeholder="Sesuai buku tabungan" />
+                      </div>
+                    </div>
+
+                    <button type="submit" disabled={loading} className="inline-flex items-center justify-center gap-2 bg-[#D4AF37] hover:bg-[#B8962E] text-black text-[11px] font-bold px-6 py-3 rounded-lg transition-all uppercase tracking-widest disabled:opacity-50 shadow-lg shadow-[#D4AF37]/10">
+                      {loading && <Loader2 className="w-3 h-3 animate-spin" />} Simpan Rekening
                     </button>
                   </form>
                 </div>
@@ -251,13 +337,7 @@ export default function SettingsPage() {
             )}
 
             {activeTab === 'security' && (
-              <motion.div
-                key="security"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="glass-card border border-white/5 overflow-hidden"
-              >
+              <motion.div key="security" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="glass-card border border-white/5 overflow-hidden">
                 <div className="p-6 border-b border-white/5 bg-white/[0.02]">
                   <div className="flex items-center gap-3">
                     <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400">
@@ -278,9 +358,7 @@ export default function SettingsPage() {
                         <div className="relative group">
                           <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[--color-text-muted] group-focus-within:text-[#D4AF37] transition-colors" />
                           <input 
-                            type="password" 
-                            required 
-                            minLength={6}
+                            type="password" required minLength={6}
                             className="w-full bg-[--color-bg-elevated] border border-[--color-border] rounded-lg pl-10 pr-4 py-2.5 text-sm text-[--color-text-primary] focus:border-[#D4AF37]/50 focus:ring-1 focus:ring-[#D4AF37]/20 focus:outline-none transition-all"
                             value={passwordForm.newPassword}
                             onChange={e => setPasswordForm({...passwordForm, newPassword: e.target.value})}
@@ -294,9 +372,7 @@ export default function SettingsPage() {
                         <div className="relative group">
                           <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[--color-text-muted] group-focus-within:text-[#D4AF37] transition-colors" />
                           <input 
-                            type="password" 
-                            required 
-                            minLength={6}
+                            type="password" required minLength={6}
                             className="w-full bg-[--color-bg-elevated] border border-[--color-border] rounded-lg pl-10 pr-4 py-2.5 text-sm text-[--color-text-primary] focus:border-[#D4AF37]/50 focus:ring-1 focus:ring-[#D4AF37]/20 focus:outline-none transition-all"
                             value={passwordForm.confirmPassword}
                             onChange={e => setPasswordForm({...passwordForm, confirmPassword: e.target.value})}
@@ -306,13 +382,8 @@ export default function SettingsPage() {
                       </div>
                     </div>
 
-                    <button 
-                      type="submit" 
-                      disabled={loading} 
-                      className="inline-flex items-center justify-center gap-2 bg-white/10 hover:bg-white/15 text-[--color-text-primary] text-[11px] font-bold px-6 py-3 rounded-lg transition-all uppercase tracking-widest disabled:opacity-50"
-                    >
-                      {loading && <Loader2 className="w-3 h-3 animate-spin" />}
-                      Update Password
+                    <button type="submit" disabled={loading} className="inline-flex items-center justify-center gap-2 bg-white/10 hover:bg-white/15 text-[--color-text-primary] text-[11px] font-bold px-6 py-3 rounded-lg transition-all uppercase tracking-widest disabled:opacity-50">
+                      {loading && <Loader2 className="w-3 h-3 animate-spin" />} Update Password
                     </button>
                   </form>
                 </div>
