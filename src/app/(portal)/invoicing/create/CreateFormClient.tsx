@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { formatRupiah } from '@/lib/utils'
-import { Plus, Trash2, ChevronRight, X, RefreshCw } from 'lucide-react'
+import { Plus, Trash2, ChevronRight, X, RefreshCw, Save, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { getDocumentTemplate } from '@/lib/document-templates'
 
 // 1. UPDATE INTERFACE
 interface Props {
@@ -14,21 +15,21 @@ interface Props {
   userId: string
   activeRole: string
   allEntities: { id: string; name: string }[]
+  initialData?: any // DITAMBAHKAN UNTUK MODE EDIT
 }
 
-// Ganti definisi interface ini
 interface LineItem {
   id: number
   description: string
-  qty: number | ''         // <-- Ubah ini
-  original_price: number | '' // <-- Ubah ini
-  discount_amount: number | '' // <-- Ubah ini
+  qty: number | ''
+  original_price: number | ''
+  discount_amount: number | ''
   unit_price: number | ''
   total_price: number
   is_recurring: boolean
   duration_months: number | ''
   revenue_account_id: string
-  discount_type: 'nominal' | 'percentage' // <-- TAMBAHKAN INI UNTUK DISKON %
+  discount_type: 'nominal' | 'percentage'
 }
 
 interface Commission {
@@ -42,9 +43,10 @@ interface Commission {
 }
 
 // 2. MASUKKAN PROPS
-export default function DocumentBuilderPage({ entityId, entityName, userId, activeRole, allEntities }: Props) {
+export default function DocumentBuilderPage({ entityId, entityName, userId, activeRole, allEntities, initialData }: Props) {
   const supabase = createClient()
   const router = useRouter()
+  const isEditing = !!initialData
 
   const [clients, setClients] = useState<any[]>([])
   const [profiles, setProfiles] = useState<any[]>([])
@@ -53,24 +55,49 @@ export default function DocumentBuilderPage({ entityId, entityName, userId, acti
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
 
-  // STATE BYPASS CEO
-  const [selectedEntityId, setSelectedEntityId] = useState(entityId)
-  const [selectedEntityName, setSelectedEntityName] = useState(entityName)
+  // STATE BYPASS CEO & DASAR FORM
+  const [selectedEntityId, setSelectedEntityId] = useState(initialData?.entity_id || entityId)
+  const [selectedEntityName, setSelectedEntityName] = useState(
+    initialData ? (allEntities.find(x => x.id === initialData.entity_id)?.name || entityName) : entityName
+  )
 
-  const [clientId, setClientId] = useState('')
-  const [docType, setDocType] = useState('QUOTATION')
-  const [title, setTitle] = useState('')
-  const [issueDate, setIssueDate] = useState(new Date().toISOString().slice(0, 10))
-  const [dueDate, setDueDate] = useState('')
-  const [blocks, setBlocks] = useState([{ id: Date.now(), content: '' }])
-  const [taxRate, setTaxRate] = useState(0)
+  const [clientId, setClientId] = useState(initialData?.client_id || '')
+  const [docType, setDocType] = useState(initialData?.doc_type || 'QUOTATION')
+  const [title, setTitle] = useState(initialData?.title || '')
+  const [issueDate, setIssueDate] = useState(initialData?.issue_date || new Date().toISOString().slice(0, 10))
+  const [dueDate, setDueDate] = useState(initialData?.due_date || '')
+  const [taxRate, setTaxRate] = useState(initialData?.tax_rate || 0)
 
-  const [lineItems, setLineItems] = useState<LineItem[]>([{
-    id: Date.now(), description: '', qty: '',          // <-- Ubah qty
-    original_price: '', discount_amount: '', unit_price: '', total_price: 0, // <-- Ubah default
-    is_recurring: false, duration_months: 1, revenue_account_id: '',
-    discount_type: 'nominal' // <-- Tambahkan ini
-  }])
+  // MENGGUNAKAN SMART TEMPLATE ATAU DATA LAMA
+  const [blocks, setBlocks] = useState<any[]>(
+    initialData?.content_blocks || []
+  )
+
+  // ENGINE TEMPLATE OTOMATIS: Berubah saat divisi atau tipe dokumen diganti (hanya jika mode Buat Baru)
+  useEffect(() => {
+    if (!isEditing) {
+      setBlocks(getDocumentTemplate(selectedEntityName, docType))
+    }
+  }, [docType, selectedEntityName, isEditing])
+
+  // MENGAMBIL ITEM DARI DATABASE JIKA EDIT, ATAU DEFAULT KOSONG
+  const [lineItems, setLineItems] = useState<LineItem[]>(
+    initialData?.items?.map((item: any) => ({
+      id: item.id || Date.now() + Math.random(),
+      description: item.description,
+      qty: item.quantity,
+      original_price: item.original_price,
+      discount_amount: item.discount_amount,
+      discount_type: item.discount_type || 'nominal',
+      unit_price: item.unit_price,
+      total_price: item.total_price,
+      is_recurring: item.is_recurring || false,
+      duration_months: item.duration_months || 1,
+      revenue_account_id: item.revenue_account_id || ''
+    })) || [{
+      id: Date.now(), description: '', qty: '', original_price: '', discount_amount: '', unit_price: '', total_price: 0, is_recurring: false, duration_months: 1, revenue_account_id: '', discount_type: 'nominal'
+    }]
+  )
 
   const [commissions, setCommissions] = useState<Commission[]>([])
   
@@ -88,6 +115,23 @@ export default function DocumentBuilderPage({ entityId, entityName, userId, acti
         const deferred = coa.find((a: any) => a.account_code === '2-1000')
         if (deferred) setDeferredAccountId(deferred.id)
       }
+
+      // Fetch Commissions Jika Mode Edit
+      if (isEditing && initialData?.id) {
+         const { data: comms } = await supabase.from('commissions').select('*').eq('invoice_id', initialData.id)
+         if (comms && comms.length > 0) {
+            setCommissions(comms.map((cm: any) => ({
+               id: cm.id,
+               recipient_type: cm.recipient_profile_id ? 'internal' : 'external',
+               recipient_profile_id: cm.recipient_profile_id || '',
+               recipient_name: cm.recipient_name || '',
+               is_percentage: cm.commission_percentage > 0,
+               commission_percentage: cm.commission_percentage,
+               commission_amount: cm.commission_amount
+            })))
+         }
+      }
+
       setLoading(false)
     }
     init()
@@ -97,32 +141,27 @@ export default function DocumentBuilderPage({ entityId, entityName, userId, acti
     setLineItems(prev => prev.map(item => {
       if (item.id !== id) return item
       
-      const u = { ...item, [field]: value }
+      const u = { ...item, [field]: value } as LineItem
       
-      // Sanitasi nilai input kosong
       const currentQty = u.qty === '' ? 0 : Number(u.qty)
       const currentOriPrice = u.original_price === '' ? 0 : Number(u.original_price)
       let currentDiscount = u.discount_amount === '' ? 0 : Number(u.discount_amount)
 
-      // Jika mengubah tipe diskon, reset nominal diskon untuk keamanan
       if (field === 'discount_type') {
          u.discount_amount = ''
          currentDiscount = 0
       }
 
-      // Hitung nominal diskon sesungguhnya
       let actualDiscountNominal = 0
       if (u.discount_type === 'percentage') {
-         // Batasi persentase maksimal 100%
          if (currentDiscount > 100) currentDiscount = 100
          actualDiscountNominal = currentOriPrice * (currentDiscount / 100)
       } else {
          actualDiscountNominal = currentDiscount
       }
 
-      // Kalkulasi Harga Satuan & Total
       u.unit_price = Math.max(0, currentOriPrice - actualDiscountNominal)
-      u.total_price = currentQty * u.unit_price
+      u.total_price = currentQty * (Number(u.unit_price) || 0)
 
       return u
     }))
@@ -130,11 +169,7 @@ export default function DocumentBuilderPage({ entityId, entityName, userId, acti
 
   function addLine() {
     setLineItems(p => [...p, {
-      id: Date.now(), description: '', qty: '',          // <-- Ubah qty
-      original_price: '', discount_amount: '', unit_price: '', total_price: 0, // <-- Ubah default
-      is_recurring: false, duration_months: 1,
-      revenue_account_id: revenueAccounts[0]?.id || '',
-      discount_type: 'nominal' // <-- Tambahkan ini
+      id: Date.now(), description: '', qty: '', original_price: '', discount_amount: '', unit_price: '', total_price: 0, is_recurring: false, duration_months: 1, revenue_account_id: revenueAccounts[0]?.id || '', discount_type: 'nominal'
     }])
   }
 
@@ -151,7 +186,7 @@ export default function DocumentBuilderPage({ entityId, entityName, userId, acti
     }))
   }
 
-  const subtotal = lineItems.reduce((s, i) => s + i.total_price, 0)
+  const subtotal = lineItems.reduce((s, i) => s + (i.total_price || 0), 0)
   const taxAmount = subtotal * (taxRate / 100)
   const grandTotal = subtotal + taxAmount
 
@@ -163,71 +198,75 @@ export default function DocumentBuilderPage({ entityId, entityName, userId, acti
 
   async function handleSave() {
     if (!clientId || !title) { toast.error('Klien dan Judul wajib diisi'); return }
+    const validLines = lineItems.filter(i => i.description.trim())
+    if (validLines.length === 0) { toast.error('Minimal 1 item layanan wajib diisi'); return }
+
     setSubmitting(true)
     try {
-      // GENERASI KODE OTOMATIS BERDASARKAN ENTITAS YANG DIPILIH
-      const divCode = selectedEntityName.substring(0, 3).toUpperCase() || 'AV'
-      const prefixMap: Record<string, string> = {
-        QUOTATION: 'QUO', SPK: 'SPK', PROFORMA: 'PRO', INVOICE: 'INV', RECEIPT: 'REC'
-      }
-      const prefix = prefixMap[docType] || 'DOC'
-      const docNumber = `${prefix}/${divCode}/${new Date().getFullYear()}/${Math.floor(1000 + Math.random() * 9000)}`
+      if (isEditing) {
+        // MODE EDIT / UPDATE DOKUMEN
+        const { error: docErr } = await supabase.from('commercial_documents').update({
+          client_id: clientId,
+          title,
+          content_blocks: blocks,
+          subtotal,
+          tax_rate: taxRate,
+          tax_amount: taxAmount,
+          grand_total: grandTotal,
+          issue_date: issueDate,
+          due_date: dueDate || null,
+          updated_at: new Date().toISOString()
+        }).eq('id', initialData.id)
+        if (docErr) throw docErr
 
-      const { data: doc, error: docErr } = await supabase.from('commercial_documents').insert({
-        entity_id: selectedEntityId, // MENGGUNAKAN ENTITAS PILIHAN
-        client_id: clientId,
-        doc_type: docType,
-        doc_number: docNumber,
-        title,
-        content_blocks: blocks,
-        subtotal,
-        tax_rate: taxRate,
-        tax_amount: taxAmount,
-        grand_total: grandTotal,
-        status: 'DRAFT',
-        issue_date: issueDate,
-        due_date: dueDate || null,
-        created_by: userId,
-      }).select().single()
-      
-      if (docErr) throw docErr
+        // Update Line Items (Hapus yang lama, insert yang baru untuk aman)
+        await supabase.from('document_line_items').delete().eq('document_id', initialData.id)
+        await supabase.from('document_line_items').insert(validLines.map((item, idx) => ({
+          document_id: initialData.id,
+          description: item.description, quantity: Number(item.qty || 0), original_price: Number(item.original_price || item.unit_price || 0), discount_amount: Number(item.discount_amount || 0), unit_price: Number(item.unit_price || item.original_price || 0), total_price: item.total_price, sort_order: idx, is_recurring: item.is_recurring, duration_months: item.is_recurring ? item.duration_months : null, revenue_account_id: item.revenue_account_id || null, deferred_account_id: item.is_recurring ? deferredAccountId : null, discount_type: item.discount_type
+        })))
 
-      if (doc && subtotal > 0) {
-        const validLines = lineItems.filter(i => i.description.trim())
-        if (validLines.length > 0) {
-          await supabase.from('document_line_items').insert(validLines.map((item, idx) => ({
-            document_id: doc.id,
-            description: item.description,
-            quantity: item.qty,
-            original_price: item.original_price || item.unit_price,
-            discount_amount: item.discount_amount || 0,
-            unit_price: item.unit_price || item.original_price,
-            total_price: item.total_price,
-            sort_order: idx,
-            is_recurring: item.is_recurring,
-            duration_months: item.is_recurring ? item.duration_months : null,
-            revenue_account_id: item.revenue_account_id || null,
-            deferred_account_id: item.is_recurring ? deferredAccountId : null,
-          })))
-        }
-
+        // Update Komisi
+        await supabase.from('commissions').delete().eq('invoice_id', initialData.id)
         const validComm = commissions.filter(c => c.commission_amount > 0)
         if (validComm.length > 0) {
           await supabase.from('commissions').insert(validComm.map(c => ({
-            invoice_id: doc.id,
-            recipient_profile_id: c.recipient_type === 'internal' ? c.recipient_profile_id : null,
-            recipient_name: c.recipient_type === 'internal'
-              ? profiles.find(p => p.id === c.recipient_profile_id)?.full_name
-              : c.recipient_name,
-            commission_percentage: c.is_percentage ? c.commission_percentage : 0,
-            commission_amount: c.commission_amount,
-            status: 'DRAFT',
+            invoice_id: initialData.id, recipient_profile_id: c.recipient_type === 'internal' ? c.recipient_profile_id : null, recipient_name: c.recipient_type === 'internal' ? profiles.find(p => p.id === c.recipient_profile_id)?.full_name : c.recipient_name, commission_percentage: c.is_percentage ? c.commission_percentage : 0, commission_amount: c.commission_amount, status: 'DRAFT',
           })))
         }
+
+        toast.success('Revisi dokumen berhasil disimpan!')
+
+      } else {
+        // MODE CREATE DOKUMEN BARU
+        const divCode = selectedEntityName.substring(0, 3).toUpperCase() || 'AV'
+        const prefixMap: Record<string, string> = { QUOTATION: 'QUO', SPK: 'SPK', PROFORMA: 'PRO', INVOICE: 'INV', RECEIPT: 'REC' }
+        const prefix = prefixMap[docType] || 'DOC'
+        const docNumber = `${prefix}/${divCode}/${new Date().getFullYear()}/${Math.floor(1000 + Math.random() * 9000)}`
+
+        const { data: doc, error: docErr } = await supabase.from('commercial_documents').insert({
+          entity_id: selectedEntityId, client_id: clientId, doc_type: docType, doc_number: docNumber, title, content_blocks: blocks, subtotal, tax_rate: taxRate, tax_amount: taxAmount, grand_total: grandTotal, status: 'DRAFT', issue_date: issueDate, due_date: dueDate || null, created_by: userId,
+        }).select().single()
+        
+        if (docErr) throw docErr
+
+        if (doc) {
+          await supabase.from('document_line_items').insert(validLines.map((item, idx) => ({
+            document_id: doc.id, description: item.description, quantity: Number(item.qty || 0), original_price: Number(item.original_price || item.unit_price || 0), discount_amount: Number(item.discount_amount || 0), unit_price: Number(item.unit_price || item.original_price || 0), total_price: item.total_price, sort_order: idx, is_recurring: item.is_recurring, duration_months: item.is_recurring ? item.duration_months : null, revenue_account_id: item.revenue_account_id || null, deferred_account_id: item.is_recurring ? deferredAccountId : null, discount_type: item.discount_type
+          })))
+
+          const validComm = commissions.filter(c => c.commission_amount > 0)
+          if (validComm.length > 0) {
+            await supabase.from('commissions').insert(validComm.map(c => ({
+              invoice_id: doc.id, recipient_profile_id: c.recipient_type === 'internal' ? c.recipient_profile_id : null, recipient_name: c.recipient_type === 'internal' ? profiles.find(p => p.id === c.recipient_profile_id)?.full_name : c.recipient_name, commission_percentage: c.is_percentage ? c.commission_percentage : 0, commission_amount: c.commission_amount, status: 'DRAFT',
+            })))
+          }
+        }
+        toast.success('Dokumen baru berhasil dibuat!')
       }
 
-      toast.success('Dokumen berhasil disimpan sebagai DRAFT.')
       router.push('/invoicing')
+      router.refresh()
     } catch (err: any) {
       toast.error(`Gagal: ${err.message}`)
     } finally {
@@ -241,14 +280,23 @@ export default function DocumentBuilderPage({ entityId, entityName, userId, acti
   if (loading) return <div className="p-8 text-xs font-mono" style={{ color: 'var(--text-muted)' }}>Memuat Generator Dokumen...</div>
 
   return (
-    <div className="p-6 md:p-8 max-w-5xl mx-auto space-y-8">
+    <div className="p-6 md:p-8 max-w-5xl mx-auto space-y-8 animate-[slide-up_0.4s_ease]">
       {/* Header */}
-      <div className="border-b pb-6" style={{ borderColor: 'var(--border-subtle)' }}>
-        <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold mb-2" style={{ color: 'var(--text-muted)' }}>
-          <span>Commercial Hub</span><ChevronRight className="w-3 h-3" /><span style={{ color: 'var(--gold)' }}>Document Builder</span>
+      <div className="border-b pb-6 flex flex-col md:flex-row md:items-center justify-between gap-4" style={{ borderColor: 'var(--border-subtle)' }}>
+        <div>
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold mb-2" style={{ color: 'var(--text-muted)' }}>
+            <span>Commercial Hub</span><ChevronRight className="w-3 h-3" /><span style={{ color: 'var(--gold)' }}>Document Builder</span>
+          </div>
+          <h1 className="text-2xl font-black tracking-tight" style={{ color: 'var(--text-primary)' }}>
+            {isEditing ? `Revisi Dokumen: ${initialData.doc_number}` : 'Pembuatan Dokumen Komersial'}
+          </h1>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Divisi Penerbit: <span className="font-bold" style={{ color: 'var(--text-primary)' }}>{selectedEntityName || 'Memuat...'}</span></p>
         </div>
-        <h1 className="text-2xl font-black tracking-tight" style={{ color: 'var(--text-primary)' }}>Pembuatan Dokumen Komersial</h1>
-        <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Divisi Penerbit: <span className="font-bold" style={{ color: 'var(--text-primary)' }}>{selectedEntityName || 'Memuat...'}</span></p>
+        <button onClick={handleSave} disabled={submitting}
+          className="btn-primary flex items-center justify-center gap-2 py-2.5 px-6 text-sm font-bold disabled:opacity-50">
+          {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          {isEditing ? 'Simpan Revisi' : 'Terbitkan Draft'}
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -260,32 +308,32 @@ export default function DocumentBuilderPage({ entityId, entityName, userId, acti
             {/* OVERRIDE DROPDOWN KHUSUS CEO */}
             {activeRole === 'CEO' && (
               <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-md mb-2">
-                <label className="text-[10px] text-red-400 font-bold uppercase tracking-widest block mb-1">CEO Override (Ubah Entitas Penerbit)</label>
-                <select className={`${fieldCls} !bg-black/50 border-red-500/50`} value={selectedEntityId} 
+                <label className="text-[10px] text-red-400 font-bold uppercase tracking-widest block mb-1">CEO Override (Ubah Entitas)</label>
+                <select className={`${fieldCls} !bg-black/50 border-red-500/50`} value={selectedEntityId} disabled={isEditing}
                   onChange={e => {
                     setSelectedEntityId(e.target.value)
                     setSelectedEntityName(allEntities.find(x => x.id === e.target.value)?.name || '')
                   }}>
-                  {allEntities.map(en => <option key={en.id} value={en.id}>{en.name}</option>)}
+                  {allEntities.map(en => <option key={en.id} value={en.id} className="bg-black">{en.name}</option>)}
                 </select>
               </div>
             )}
 
             <div>
-              <label className="section-label block mb-1.5">Klien *</label>
-              <select className={fieldCls} value={clientId} onChange={e => setClientId(e.target.value)}>
-                <option value="" disabled>-- Pilih Klien --</option>
-                {clients.map(c => <option key={c.id} value={c.id}>{c.company_name}</option>)}
-              </select>
-            </div>
-            <div>
               <label className="section-label block mb-1.5">Tipe Dokumen *</label>
-              <select className={`${fieldCls} font-bold`} style={{ color: 'var(--gold)' }} value={docType} onChange={e => setDocType(e.target.value)}>
+              <select className={`${fieldCls} font-bold`} style={{ color: 'var(--gold)' }} value={docType} disabled={isEditing} onChange={e => setDocType(e.target.value)}>
                 <option value="QUOTATION">Quotation / Offering</option>
                 <option value="SPK">SPK</option>
                 <option value="PROFORMA">Proforma Invoice</option>
                 <option value="INVOICE">Invoice</option>
                 <option value="RECEIPT">Receipt</option>
+              </select>
+            </div>
+            <div>
+              <label className="section-label block mb-1.5">Klien *</label>
+              <select className={fieldCls} value={clientId} onChange={e => setClientId(e.target.value)}>
+                <option value="" disabled>-- Pilih Klien --</option>
+                {clients.map(c => <option key={c.id} value={c.id}>{c.company_name}</option>)}
               </select>
             </div>
             <div>
@@ -301,7 +349,7 @@ export default function DocumentBuilderPage({ entityId, entityName, userId, acti
               <input type="date" className={fieldCls} value={issueDate} onChange={e => setIssueDate(e.target.value)} />
             </div>
             <div>
-              <label className="section-label block mb-1.5">Jatuh Tempo</label>
+              <label className="section-label block mb-1.5">Jatuh Tempo (Opsional)</label>
               <input type="date" className={fieldCls} value={dueDate} onChange={e => setDueDate(e.target.value)} />
             </div>
           </div>
@@ -309,28 +357,30 @@ export default function DocumentBuilderPage({ entityId, entityName, userId, acti
 
         {/* RIGHT: Content + Line Items + Commissions */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Paragraphs */}
+          {/* Paragraphs / Content Blocks */}
           <div className="glass-card p-5">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--gold)' }}>Teks Paragraf</h2>
-              <button onClick={() => setBlocks(p => [...p, { id: Date.now(), content: '' }])}
+              <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--gold)' }}>Struktur Konten (Copywriting)</h2>
+              <button onClick={() => setBlocks(p => [...p, { id: Date.now(), title: '', content: '' }])} type="button"
                 className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-1" style={{ color: 'var(--gold)' }}>
-                <Plus className="w-3 h-3" /> Tambah Blok
+                <Plus className="w-3 h-3" /> Tambah Paragraf
               </button>
             </div>
-            <div className="space-y-3">
+            <div className="space-y-4">
               {blocks.map((b, i) => (
-                <div key={b.id} className="relative group">
-                  <div className="absolute -left-3 top-2 bottom-2 w-1 rounded-full transition-colors"
-                    style={{ background: 'var(--gold)', opacity: 0.2 }} />
-                  <textarea rows={3} className="w-full rounded-md p-3 text-sm resize-y outline-none input-field"
-                    placeholder="Isi paragraf..." value={b.content}
+                <div key={b.id} className="relative group p-4 border rounded-md transition-colors" style={{ borderColor: 'var(--border-subtle)', background: 'var(--bg-elevated)' }}>
+                  <input type="text" placeholder={`Judul Bagian ${i + 1} (Opsional)`} value={b.title || ''} 
+                    onChange={e => setBlocks(p => p.map(x => x.id === b.id ? { ...x, title: e.target.value } : x))}
+                    className="w-full bg-transparent text-sm font-bold mb-2 outline-none" style={{ color: 'var(--text-primary)' }} />
+                  <textarea rows={3} className="w-full text-xs resize-y outline-none bg-transparent" style={{ color: 'var(--text-muted)' }}
+                    placeholder="Isi paragraf detail..." value={b.content}
                     onChange={e => setBlocks(p => p.map(x => x.id === b.id ? { ...x, content: e.target.value } : x))} />
+                  
                   {blocks.length > 1 && (
-                    <button onClick={() => setBlocks(p => p.filter(x => x.id !== b.id))}
+                    <button type="button" onClick={() => setBlocks(p => p.filter(x => x.id !== b.id))}
                       className="absolute right-2 top-2 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
                       style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>
-                      <X className="w-3 h-3" />
+                      <Trash2 className="w-3 h-3" />
                     </button>
                   )}
                 </div>
@@ -342,7 +392,7 @@ export default function DocumentBuilderPage({ entityId, entityName, userId, acti
           <div className="glass-card p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--gold)' }}>Rincian Harga (Line Items)</h2>
-              <button onClick={addLine} className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-1" style={{ color: 'var(--gold)' }}>
+              <button type="button" onClick={addLine} className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-1" style={{ color: 'var(--gold)' }}>
                 <Plus className="w-3 h-3" /> Tambah Item
               </button>
             </div>
@@ -355,7 +405,7 @@ export default function DocumentBuilderPage({ entityId, entityName, userId, acti
                       placeholder="Deskripsi jasa / barang..." value={item.description}
                       onChange={e => updateLine(item.id, 'description', e.target.value)} />
                     {lineItems.length > 1 && (
-                      <button onClick={() => setLineItems(p => p.filter(i => i.id !== item.id))}
+                      <button type="button" onClick={() => setLineItems(p => p.filter(i => i.id !== item.id))}
                         className="mt-1 p-1 rounded hover:text-red-400 transition-colors" style={{ color: 'var(--text-muted)' }}>
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -381,11 +431,10 @@ export default function DocumentBuilderPage({ entityId, entityName, userId, acti
                       />
                     </div>
                     
-                    {/* MODIFIKASI AREA DISKON */}
+                    {/* AREA DISKON SWITCH */}
                     <div className="relative">
                       <div className="flex items-center justify-between mb-1">
                         <label className="text-[9px] font-bold uppercase tracking-widest" style={{ color: '#f97316' }}>Diskon</label>
-                        {/* Switcher Tipe Diskon */}
                         <select 
                           className="text-[9px] bg-transparent outline-none font-bold uppercase cursor-pointer" 
                           style={{ color: '#f97316' }}
@@ -405,7 +454,6 @@ export default function DocumentBuilderPage({ entityId, entityName, userId, acti
                           onChange={e => updateLine(item.id, 'discount_amount', e.target.value === '' ? '' : Number(e.target.value))} 
                           placeholder="0"
                         />
-                        {/* Simbol Indikator */}
                         <span className="absolute right-0 top-1/2 -translate-y-1/2 text-xs font-mono" style={{ color: '#f97316' }}>
                            {item.discount_type === 'percentage' ? '%' : ''}
                         </span>
@@ -419,10 +467,10 @@ export default function DocumentBuilderPage({ entityId, entityName, userId, acti
                   </div>
 
                   {/* Revenue account + Recurring */}
-                  <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div className="grid grid-cols-2 gap-3 pt-1 border-t mt-2" style={{ borderColor: 'var(--border-subtle)' }}>
                     <div>
-                      <label className="text-[9px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>Akun Revenue</label>
-                      <select className="select-field w-full text-xs mt-1" value={item.revenue_account_id}
+                      <label className="text-[9px] font-bold uppercase tracking-widest block mb-1" style={{ color: 'var(--text-muted)' }}>Akun Revenue (COA)</label>
+                      <select className="select-field w-full text-xs" value={item.revenue_account_id}
                         onChange={e => updateLine(item.id, 'revenue_account_id', e.target.value)}>
                         <option value="">-- Pilih Akun --</option>
                         {revenueAccounts.map(a => <option key={a.id} value={a.id}>{a.account_name}</option>)}
@@ -443,7 +491,7 @@ export default function DocumentBuilderPage({ entityId, entityName, userId, acti
                             value={item.duration_months}
                             onChange={e => updateLine(item.id, 'duration_months', Number(e.target.value))} />
                           <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
-                            ≈ {formatRupiah(Number(item.original_price) / (Number(item.duration_months) || 1))} / bln
+                            ≈ {formatRupiah(Number(item.original_price || 0) / (Number(item.duration_months) || 1))} / bln
                           </p>
                         </div>
                       )}
@@ -463,6 +511,7 @@ export default function DocumentBuilderPage({ entityId, entityName, userId, acti
                   value={taxRate} onChange={e => setTaxRate(Number(e.target.value))}>
                   <option value={0}>Non-PPN (0%)</option>
                   <option value={11}>PPN (11%)</option>
+                  <option value={12}>PPN (12%)</option>
                 </select>
                 <span className="font-mono">{formatRupiah(taxAmount)}</span>
               </div>
@@ -477,9 +526,9 @@ export default function DocumentBuilderPage({ entityId, entityName, userId, acti
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--gold)' }}>Komisi (Opsional)</h2>
-                <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>Akan aktif otomatis saat invoice PAID</p>
+                <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>Otomatis dicairkan saat invoice lunas.</p>
               </div>
-              <button onClick={() => setCommissions(p => [...p, {
+              <button type="button" onClick={() => setCommissions(p => [...p, {
                 id: Date.now(), recipient_type: 'external', recipient_profile_id: '',
                 recipient_name: '', is_percentage: true, commission_percentage: 0, commission_amount: 0,
               }])} className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-1" style={{ color: 'var(--gold)' }}>
@@ -508,11 +557,11 @@ export default function DocumentBuilderPage({ entityId, entityName, userId, acti
                     {c.recipient_type === 'internal' ? (
                       <select className="select-field w-full text-xs mt-1" value={c.recipient_profile_id}
                         onChange={e => updateCommission(c.id, 'recipient_profile_id', e.target.value)}>
-                        <option value="">-- Pilih --</option>
+                        <option value="">-- Pilih Tim --</option>
                         {profiles.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
                       </select>
                     ) : (
-                      <input className="input-field w-full px-2 py-1.5 text-xs mt-1 rounded" placeholder="Nama penerima"
+                      <input className="input-field w-full px-2 py-1.5 text-xs mt-1 rounded" placeholder="Nama..."
                         value={c.recipient_name} onChange={e => updateCommission(c.id, 'recipient_name', e.target.value)} />
                     )}
                   </div>
@@ -537,7 +586,7 @@ export default function DocumentBuilderPage({ entityId, entityName, userId, acti
                     )}
                   </div>
                   <div className="flex justify-end">
-                    <button onClick={() => setCommissions(p => p.filter(x => x.id !== c.id))}
+                    <button type="button" onClick={() => setCommissions(p => p.filter(x => x.id !== c.id))}
                       className="p-2 rounded hover:text-red-400 transition-colors" style={{ color: 'var(--text-muted)' }}>
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -545,14 +594,6 @@ export default function DocumentBuilderPage({ entityId, entityName, userId, acti
                 </div>
               ))}
             </div>
-          </div>
-
-          {/* Save */}
-          <div className="flex justify-end">
-            <button onClick={handleSave} disabled={submitting}
-              className="btn-primary flex items-center gap-2 py-3 px-8 text-sm">
-              {submitting ? 'Menyimpan...' : '✓ Simpan Draft Dokumen'}
-            </button>
           </div>
         </div>
       </div>

@@ -1,179 +1,199 @@
-import { Document, Page, Text, View, StyleSheet, Font, Image } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer'
+import { formatRupiah } from '../utils'
 
-// Register Font (Ganti dengan URL font Anda jika ada, atau gunakan standar Helvetica)
-Font.register({
-  family: 'Inter',
-  fonts: [
-    { src: 'https://fonts.gstatic.com/s/inter/v12/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyeMZhrib2Bg-4.ttf', fontWeight: 400 },
-    { src: 'https://fonts.gstatic.com/s/inter/v12/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuFuYMZhrib2Bg-4.ttf', fontWeight: 700 },
-  ]
-});
+// HAPUS FONT.REGISTER: Kita menggunakan Built-in PDF Fonts (Helvetica) untuk Stabilitas 100% dan Zero-Latency.
 
 const styles = StyleSheet.create({
-  page: { padding: 40, fontFamily: 'Helvetica', fontSize: 10, color: '#1A1A1A' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 40, borderBottomWidth: 2, paddingBottom: 15 },
-  logoBox: { width: 120, height: 40 },
-  entityInfo: { textAlign: 'right' },
-  entityName: { fontSize: 16, fontWeight: 'bold', textTransform: 'uppercase' },
-  entitySub: { fontSize: 8, color: '#666', marginTop: 4 },
+  // Gunakan Helvetica sebagai font native
+  page: { padding: 50, fontFamily: 'Helvetica', fontSize: 10, color: '#1a1a1a', lineHeight: 1.2 },
   
+  // HEADER
+  headerContainer: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'flex-start', 
+    marginBottom: 40, 
+    borderBottomWidth: 1, 
+    borderBottomColor: '#eeeeee', 
+    paddingBottom: 20 
+  },
+  logoBox: { width: 140 },
+  logo: { width: '100%', height: 'auto' },
+  addressBox: { width: 250, textAlign: 'right' },
+  companyTitle: { fontSize: 11, fontFamily: 'Helvetica-Bold', color: '#111827', marginBottom: 4 },
+  addressText: { fontSize: 8, color: '#6b7280', lineHeight: 1.4 },
+
+  // INFO DOKUMEN & KLIEN
   metaSection: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 30 },
-  clientBox: { width: '50%' },
-  metaLabel: { fontSize: 8, color: '#666', textTransform: 'uppercase', marginBottom: 4 },
-  clientName: { fontSize: 12, fontWeight: 'bold', marginBottom: 2 },
+  clientBox: { flex: 1 },
+  docInfoBox: { width: 180, textAlign: 'right' },
+  label: { fontSize: 8, color: '#9ca3af', textTransform: 'uppercase', marginBottom: 2, fontFamily: 'Helvetica-Bold' },
+  valueBold: { fontSize: 11, fontFamily: 'Helvetica-Bold', color: '#111827' },
+  docTypeTitle: { fontSize: 26, fontFamily: 'Helvetica-Bold', color: '#111827', textTransform: 'uppercase' },
+
+  // CONTENT BLOCKS
+  blockWrapper: { marginBottom: 12 },
+  blockTitle: { fontSize: 9, fontFamily: 'Helvetica-Bold', marginBottom: 3, textTransform: 'uppercase', color: '#D4AF37' },
+  blockContent: { fontSize: 9, color: '#374151', textAlign: 'justify', lineHeight: 1.3 },
+
+  // TABLE RINCIAN LAYANAN
+  tableHeader: { 
+    flexDirection: 'row', 
+    backgroundColor: '#f9fafb', 
+    borderTopWidth: 1, 
+    borderTopColor: '#eeeeee', 
+    borderBottomWidth: 1, 
+    borderBottomColor: '#eeeeee', 
+    padding: 8, 
+    marginTop: 15 
+  },
+  tableRow: { 
+    flexDirection: 'row', 
+    borderBottomWidth: 1, 
+    borderBottomColor: '#f3f4f6', 
+    padding: 8, 
+    alignItems: 'center' 
+  },
+  colDesc: { flex: 3 },
+  colQty: { width: 40, textAlign: 'center' },
+  colPrice: { width: 100, textAlign: 'right' },
+  colTotal: { width: 100, textAlign: 'right' },
+  tableLabel: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: '#6b7280', textTransform: 'uppercase' },
+
+  // SUMMARY
+  summaryContainer: { marginTop: 20, flexDirection: 'row', justifyContent: 'flex-end' },
+  summaryBox: { width: 220, borderTopWidth: 2, borderTopColor: '#111827', paddingTop: 10 },
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+  grandTotal: { fontSize: 13, fontFamily: 'Helvetica-Bold', color: '#D4AF37', marginTop: 5 },
   
-  docInfoBox: { width: '40%', textAlign: 'right' },
-  docTitle: { fontSize: 14, fontWeight: 'bold', color: '#D4AF37', textTransform: 'uppercase', marginBottom: 8 },
-  metaRow: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 3 },
-  metaRowLabel: { color: '#666', marginRight: 10, fontSize: 9 },
-  metaRowValue: { fontWeight: 'bold', fontSize: 9 },
+  footer: { 
+    position: 'absolute', 
+    bottom: 30, 
+    left: 50, 
+    right: 50, 
+    textAlign: 'center', 
+    fontSize: 7, 
+    color: '#9ca3af', 
+    borderTopWidth: 1, 
+    borderTopColor: '#eeeeee', 
+    paddingTop: 10 
+  }
+})
 
-  // Content Blocks
-  blocksSection: { marginBottom: 30 },
-  textBlock: { marginBottom: 10, lineHeight: 1.5, textAlign: 'justify' },
+// PENTING: Nama function harus persis "CommercialDocumentPDF" agar dikenali oleh route.ts
+export function CommercialDocumentPDF({ data }: { data: any }) {
+  const issueDate = data.issue_date ? new Date(data.issue_date).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }) : '-'
+  const dueDate = data.due_date ? new Date(data.due_date).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }) : '-'
 
-  // Table
-  table: { width: '100%', marginBottom: 30 },
-  tableHeader: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#000', paddingBottom: 5, marginBottom: 5 },
-  tableRow: { flexDirection: 'row', paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: '#EEE' },
-  colDesc: { flex: 1 },
-  colQty: { width: '10%', textAlign: 'center' },
-  colPrice: { width: '20%', textAlign: 'right' },
-  colTotal: { width: '20%', textAlign: 'right' },
-  
-  // Financial Summary
-  summaryBox: { width: '40%', alignSelf: 'flex-end', marginTop: 10 },
-  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
-  summaryGrand: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderTopWidth: 2, borderTopColor: '#000', marginTop: 4 },
-  grandText: { fontSize: 12, fontWeight: 'bold' },
+  // URL absolut ke file PNG (bukan SVG).
+  // Saat dideploy ke production, ganti http://localhost:3000 menjadi URL domain Anda, 
+  // atau gunakan process.env.NEXT_PUBLIC_APP_URL
+  const logoUrl = 'http://localhost:3000/logo.png'
 
-  footer: { position: 'absolute', bottom: 30, left: 40, right: 40, textAlign: 'center', fontSize: 8, color: '#888', borderTopWidth: 1, borderTopColor: '#EEE', paddingTop: 10 }
-});
-
-const formatRupiah = (num: number) => `Rp ${num.toLocaleString('id-ID')}`;
-
-export const CommercialDocumentPDF = ({ data }: { data: any }) => {
-  const entityColor = data.entities?.primary_color || '#000000';
-  
   return (
-    <Document>
+    <Document title={`${data.doc_type} - ${data.doc_number}`}>
       <Page size="A4" style={styles.page}>
         
-        {/* KOP SURAT (HEADER) */}
-        <View style={[styles.header, { borderBottomColor: entityColor }]}>
+        <View style={styles.headerContainer}>
           <View style={styles.logoBox}>
-            {/* Jika Anda punya field logo_url di entitas, bisa di-load di sini */}
-            <Text style={{ fontSize: 20, fontWeight: 'bold', color: entityColor }}>{data.entities?.name}</Text>
+            <Image src={logoUrl} style={styles.logo} />
           </View>
-          <View style={styles.entityInfo}>
-            <Text style={styles.entityName}>{data.entities?.name}</Text>
-            {data.entities?.name?.toLowerCase().includes('weatso') ? (
-              <>
-                <Text style={styles.entitySub}>Weatso Digital Agency HQ</Text>
-                <Text style={styles.entitySub}>Semarang, Jawa Tengah, Indonesia</Text>
-              </>
-            ) : data.entities?.name?.toLowerCase().includes('evory') ? (
-              <>
-                <Text style={styles.entitySub}>Evory Organizer Studio</Text>
-                <Text style={styles.entitySub}>Semarang, Jawa Tengah, Indonesia</Text>
-              </>
-            ) : (
-              <>
-                <Text style={styles.entitySub}>Member of Vision Velocity Ventures</Text>
-                <Text style={styles.entitySub}>Semarang, Indonesia</Text>
-              </>
-            )}
+          <View style={styles.addressBox}>
+            <Text style={styles.companyTitle}>WE ARE THE SOLUTION INDONESIA</Text>
+            <Text style={styles.addressText}>
+              Jl. Kaba Raya No.44, Tandang, Kec. Tembalang,{"\n"}
+              Kota Semarang, Jawa Tengah 50274
+            </Text>
           </View>
         </View>
 
-        {/* METADATA (KLIEN & INFO DOKUMEN) */}
         <View style={styles.metaSection}>
           <View style={styles.clientBox}>
-            <Text style={styles.metaLabel}>Ditujukan Kepada:</Text>
-            <Text style={styles.clientName}>{data.clients?.company_name}</Text>
-            <Text style={{ fontSize: 10, marginBottom: 2 }}>Attn: {data.clients?.pic_name}</Text>
-            {data.clients?.billing_address && <Text style={{ fontSize: 9, color: '#444' }}>{data.clients.billing_address}</Text>}
-            {data.clients?.npwp && <Text style={{ fontSize: 8, color: '#666', marginTop: 4 }}>NPWP: {data.clients.npwp}</Text>}
+            <Text style={styles.label}>Dipersiapkan Untuk:</Text>
+            <Text style={styles.valueBold}>{data.client?.company_name || 'Klien Umum'}</Text>
+            <Text style={[styles.addressText, { marginTop: 2 }]}>
+              PIC: {data.client?.pic_name} {data.client?.pic_phone ? `(${data.client.pic_phone})` : ''}
+            </Text>
           </View>
-
           <View style={styles.docInfoBox}>
-            <Text style={[styles.docTitle, { color: entityColor }]}>{data.doc_type.replace('_', ' ')}</Text>
-            <View style={styles.metaRow}>
-              <Text style={styles.metaRowLabel}>No. Dokumen:</Text>
-              <Text style={styles.metaRowValue}>{data.doc_number}</Text>
+            <Text style={styles.docTypeTitle}>{data.doc_type}</Text>
+            <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#D4AF37', marginTop: 2 }}>No. {data.doc_number}</Text>
+            <View style={{ marginTop: 10 }}>
+              <Text style={styles.label}>Tanggal Terbit: {issueDate}</Text>
+              {data.due_date && <Text style={styles.label}>Jatuh Tempo: {dueDate}</Text>}
             </View>
-            <View style={styles.metaRow}>
-              <Text style={styles.metaRowLabel}>Tanggal Terbit:</Text>
-              <Text style={styles.metaRowValue}>{new Date(data.issue_date).toLocaleDateString('id-ID')}</Text>
-            </View>
-            {data.due_date && (
-              <View style={styles.metaRow}>
-                <Text style={styles.metaRowLabel}>Jatuh Tempo:</Text>
-                <Text style={styles.metaRowValue}>{new Date(data.due_date).toLocaleDateString('id-ID')}</Text>
-              </View>
-            )}
           </View>
         </View>
 
-        {/* JUDUL PROYEK */}
-        <Text style={{ fontSize: 11, fontWeight: 'bold', marginBottom: 15, textTransform: 'uppercase' }}>
-          Perihal: {data.title}
-        </Text>
+        <View style={{ marginBottom: 25 }}>
+          <Text style={styles.label}>Perihal Proyek:</Text>
+          <Text style={[styles.valueBold, { fontSize: 13, borderBottomWidth: 1, borderBottomColor: '#f3f4f6', paddingBottom: 5 }]}>
+            {data.title}
+          </Text>
+        </View>
 
-        {/* MESIN PARAGRAF DINAMIS (JSONB BLOCKS) */}
-        {data.content_blocks && data.content_blocks.length > 0 && (
-          <View style={styles.blocksSection}>
-            {data.content_blocks.map((block: any, idx: number) => (
-              <Text key={idx} style={styles.textBlock}>{block.content}</Text>
-            ))}
+        {data.content_blocks?.map((block: any) => (
+          <View key={block.id} style={styles.blockWrapper}>
+            {block.title && <Text style={styles.blockTitle}>{block.title}</Text>}
+            <Text style={styles.blockContent}>{block.content}</Text>
           </View>
-        )}
+        ))}
 
-        {/* TABEL FINANSIAL (Hanya tampil jika ada harganya) */}
-        {data.document_line_items && data.document_line_items.length > 0 && (
-          <View style={styles.table}>
-            <View style={styles.tableHeader}>
-              <Text style={[styles.colDesc, { fontWeight: 'bold' }]}>Deskripsi Item</Text>
-              <Text style={[styles.colQty, { fontWeight: 'bold' }]}>Qty</Text>
-              <Text style={[styles.colPrice, { fontWeight: 'bold' }]}>Harga</Text>
-              <Text style={[styles.colTotal, { fontWeight: 'bold' }]}>Total</Text>
-            </View>
-            {data.document_line_items.map((item: any, idx: number) => (
-              <View key={idx} style={styles.tableRow}>
-                <Text style={styles.colDesc}>{item.description}</Text>
-                <Text style={styles.colQty}>{item.quantity}</Text>
-                <Text style={styles.colPrice}>{formatRupiah(item.unit_price)}</Text>
-                <Text style={styles.colTotal}>{formatRupiah(item.total_price)}</Text>
+        <View style={{ marginTop: 10 }}>
+          <View style={styles.tableHeader}>
+            <Text style={[styles.tableLabel, styles.colDesc]}>Deskripsi Layanan / Proyek</Text>
+            <Text style={[styles.tableLabel, styles.colQty]}>Qty</Text>
+            <Text style={[styles.tableLabel, styles.colPrice]}>Harga Satuan</Text>
+            <Text style={[styles.tableLabel, styles.colTotal]}>Total</Text>
+          </View>
+
+          {data.items?.length > 0 ? (
+            data.items.map((item: any, i: number) => (
+              <View key={i} style={styles.tableRow}>
+                <View style={styles.colDesc}>
+                  <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: '#111827' }}>{item.description}</Text>
+                </View>
+                <Text style={[styles.blockContent, styles.colQty]}>{item.quantity}</Text>
+                <Text style={[styles.blockContent, styles.colPrice]}>{formatRupiah(item.unit_price)}</Text>
+                <Text style={[styles.blockContent, styles.colTotal, { fontFamily: 'Helvetica-Bold', color: '#111827' }]}>
+                  {formatRupiah(item.total_price)}
+                </Text>
               </View>
-            ))}
-          </View>
-        )}
+            ))
+          ) : (
+            <View style={styles.tableRow}>
+              <Text style={[styles.blockContent, { flex: 1, textAlign: 'center', color: '#9ca3af', padding: 10 }]}>
+                Tidak ada rincian item layanan.
+              </Text>
+            </View>
+          )}
+        </View>
 
-        {/* REKAP TOTAL (Hanya tampil jika Subtotal > 0) */}
-        {data.subtotal > 0 && (
+        <View style={styles.summaryContainer}>
           <View style={styles.summaryBox}>
             <View style={styles.summaryRow}>
-              <Text>Subtotal:</Text>
-              <Text>{formatRupiah(data.subtotal)}</Text>
+              <Text style={styles.blockContent}>Subtotal</Text>
+              <Text style={[styles.blockContent, { fontFamily: 'Helvetica-Bold' }]}>{formatRupiah(data.subtotal)}</Text>
             </View>
             {data.tax_amount > 0 && (
               <View style={styles.summaryRow}>
-                <Text>Pajak ({data.tax_rate}%):</Text>
-                <Text>{formatRupiah(data.tax_amount)}</Text>
+                <Text style={styles.blockContent}>PPN ({data.tax_rate}%)</Text>
+                <Text style={[styles.blockContent, { fontFamily: 'Helvetica-Bold' }]}>{formatRupiah(data.tax_amount)}</Text>
               </View>
             )}
-            <View style={styles.summaryGrand}>
-              <Text style={styles.grandText}>GRAND TOTAL:</Text>
-              <Text style={[styles.grandText, { color: entityColor }]}>{formatRupiah(data.grand_total)}</Text>
+            <View style={[styles.summaryRow, { marginTop: 6, borderTopWidth: 1, borderTopColor: '#f3f4f6', paddingTop: 6 }]}>
+              <Text style={[styles.blockContent, { fontFamily: 'Helvetica-Bold' }]}>TOTAL INVESTASI</Text>
+              <Text style={styles.grandTotal}>{formatRupiah(data.grand_total)}</Text>
             </View>
           </View>
-        )}
+        </View>
 
-        {/* FOOTER */}
-        <Text style={styles.footer}>
-          Dokumen ini diterbitkan secara sah oleh {data.entities?.name || 'Vision Velocity Ventures'} dan digenerate otomatis oleh Anugerah OS.
-        </Text>
+        <View style={styles.footer}>
+          <Text>Dokumen ini adalah penawaran resmi dari WE ARE THE SOLUTION INDONESIA dan diterbitkan secara elektronik.</Text>
+          <Text style={{ marginTop: 2, fontFamily: 'Helvetica-Bold' }}>Bespoke Enterprise IT Consultancy • Semarang, Indonesia</Text>
+        </View>
+
       </Page>
     </Document>
-  );
-};
+  )
+}
