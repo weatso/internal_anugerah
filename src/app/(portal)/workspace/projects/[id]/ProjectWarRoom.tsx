@@ -409,6 +409,7 @@ export default function ProjectWarRoom({ project, logs: initLogs, documents, cur
                 <tr>
                   <th className="px-5 py-3 text-left">No. Dokumen</th>
                   <th className="px-5 py-3 text-left">Perihal</th>
+                  <th className="px-5 py-3 text-left">Termin</th>
                   <th className="px-5 py-3 text-right">Nilai</th>
                   <th className="px-5 py-3 text-center">Status</th>
                   <th className="px-5 py-3 text-right">PDF</th>
@@ -419,6 +420,14 @@ export default function ProjectWarRoom({ project, logs: initLogs, documents, cur
                   <tr key={doc.id}>
                     <td className="px-5 py-3 font-mono text-xs" style={{ color: 'var(--gold)' }}>{doc.doc_number}</td>
                     <td className="px-5 py-3" style={{ color: 'var(--text-primary)' }}>{doc.title}</td>
+                    <td className="px-5 py-3 text-xs">
+                      {doc.termin_name ? (
+                        <span className="font-bold px-2 py-0.5 rounded text-[9px] uppercase"
+                          style={{ background: 'rgba(249,115,22,0.1)', color: '#f97316' }}>
+                          {doc.termin_name}
+                        </span>
+                      ) : '—'}
+                    </td>
                     <td className="px-5 py-3 text-right font-mono" style={{ color: 'var(--text-primary)' }}>{formatRupiah(doc.grand_total)}</td>
                     <td className="px-5 py-3 text-center"><span className={`text-[10px] font-bold uppercase ${STATUS_STYLE[doc.status] || 'text-neutral-400'}`}>{doc.status}</span></td>
                     <td className="px-5 py-3 text-right">
@@ -569,9 +578,11 @@ export default function ProjectWarRoom({ project, logs: initLogs, documents, cur
             <h2 className="text-xs font-black uppercase tracking-widest" style={{ color: 'var(--gold)' }}>SLA Checklist</h2>
             {[
               { label: 'Kick-off Meeting dengan Klien', done: !!project.start_date },
-              { label: 'Invoice diterbitkan', done: !!project.invoice_id },
-              { label: 'Pembayaran diterima', done: project.invoice?.status === 'PAID' },
-              { label: 'Proyek aktif / ongoing', done: ['ONGOING','MAINTENANCE','COMPLETED'].includes(project.status) },
+              { label: 'Invoice diterbitkan', done: documents.some((d: any) => d.doc_type === 'INVOICE') },
+              // FIX: cek status PAID dari documents array (bukan project.invoice?.status yang tidak di-join)
+              { label: 'Pembayaran diterima', done: documents.some((d: any) => d.doc_type === 'INVOICE' && d.status === 'PAID') },
+              // FIX: gunakan status DB yang valid (ACTIVE, ON_HOLD, COMPLETED, CANCELLED)
+              { label: 'Proyek aktif / ongoing', done: ['ACTIVE', 'ON_HOLD', 'COMPLETED'].includes(project.status) },
               { label: 'Project selesai', done: project.status === 'COMPLETED' },
             ].map((item, i) => (
               <div key={i} className="flex items-center gap-3 text-sm">

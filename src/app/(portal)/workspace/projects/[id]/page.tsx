@@ -29,15 +29,44 @@ export default async function ProjectWarRoomPage({ params }: { params: Promise<{
 
   if (!project) redirect('/workspace')
 
+  // FIX: Fetch ALL related documents, bukan hanya 1 invoice
+  // Bangun daftar ID: invoice_id + spk_id + parent (quotation) dari SPK + semua invoice anak SPK
+  const docIdSet = new Set<string>()
+
+  if (project.invoice_id) docIdSet.add(project.invoice_id)
+  if (project.spk_id)     docIdSet.add(project.spk_id)
+
+  // Kalau ada SPK, fetch parent-nya (Quotation) dan semua Invoice anak-nya
+  if (project.spk_id) {
+    const { data: spkDoc } = await db
+      .from('commercial_documents')
+      .select('id, parent_id')
+      .eq('id', project.spk_id)
+      .single()
+
+    if (spkDoc?.parent_id) docIdSet.add(spkDoc.parent_id)
+
+    // Semua invoice yang parent_id = spk_id
+    const { data: childInvoices } = await db
+      .from('commercial_documents')
+      .select('id')
+      .eq('parent_id', project.spk_id)
+
+    childInvoices?.forEach((inv: any) => docIdSet.add(inv.id))
+  }
+
+  const docIds = Array.from(docIdSet)
+
   const [{ data: logs }, { data: documents }] = await Promise.all([
     db.from('workspace_logs')
       .select('*, creator:profiles!workspace_logs_created_by_fkey(full_name)')
       .eq('project_id', id)
       .order('created_at', { ascending: false }),
-    project.invoice_id
+    docIds.length > 0
       ? db.from('commercial_documents')
-          .select('id, doc_number, doc_type, title, status, grand_total')
-          .eq('id', project.invoice_id)
+          .select('id, doc_number, doc_type, title, status, grand_total, created_at, termin_name')
+          .in('id', docIds)
+          .order('created_at', { ascending: true })
       : Promise.resolve({ data: [] }),
   ])
 
@@ -45,7 +74,7 @@ export default async function ProjectWarRoomPage({ params }: { params: Promise<{
     <ProjectWarRoom
       project={project}
       logs={logs || []}
-      documents={documents || []}
+      documents={(documents as any) || []}
       currentUserId={session.user.id}
     />
   )

@@ -14,6 +14,12 @@ export interface Entity {
   type: EntityType
   logo_key: string | null
   primary_color: string | null
+  // Fields untuk PDF / Dokumen Komersial (dikelola di Admin Panel)
+  address: string | null
+  phone: string | null
+  email: string | null
+  tagline: string | null
+  logo_url: string | null    // path relatif ke /public, misal: /logo-png/weatso.png
 }
 
 export interface Profile {

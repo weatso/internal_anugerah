@@ -38,7 +38,11 @@ export default function AdminClient({ initialProfiles, initialEntities, initialU
 
   // Entity form
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null)
-  const [entityForm, setEntityForm] = useState({ name: '', type: 'DIVISION', logo_key: '', primary_color: '#C5A028' })
+  const [entityForm, setEntityForm] = useState({
+    name: '', type: 'DIVISION', logo_key: '', primary_color: '#C5A028',
+    // Fields PDF
+    address: '', phone: '', email: '', tagline: '', logo_url: ''
+  })
 
   const [loading, setLoading] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
@@ -129,7 +133,7 @@ export default function AdminClient({ initialProfiles, initialEntities, initialU
         toast.success('Entitas baru ditambahkan.')
       }
       setSelectedEntity(null)
-      setEntityForm({ name: '', type: 'DIVISION', logo_key: '', primary_color: '#C5A028' })
+      setEntityForm({ name: '', type: 'DIVISION', logo_key: '', primary_color: '#C5A028', address: '', phone: '', email: '', tagline: '', logo_url: '' })
       router.refresh()
     } catch (err: any) {
       toast.error(err.message)
@@ -365,7 +369,7 @@ export default function AdminClient({ initialProfiles, initialEntities, initialU
                 <p className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
                   Daftar Entitas ({entities.length})
                 </p>
-                <button onClick={() => { setSelectedEntity(null); setEntityForm({ name: '', type: 'DIVISION', logo_key: '', primary_color: '#C5A028' }) }}
+                <button onClick={() => { setSelectedEntity(null); setEntityForm({ name: '', type: 'DIVISION', logo_key: '', primary_color: '#C5A028', address: '', phone: '', email: '', tagline: '', logo_url: '' }) }}
                   className="text-xs font-bold px-3 py-1.5 rounded"
                   style={{ background: 'var(--gold-glow)', color: 'var(--gold)' }}>
                   + Baru
@@ -374,7 +378,20 @@ export default function AdminClient({ initialProfiles, initialEntities, initialU
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[65vh] overflow-y-auto pr-1">
                 {entities.map(ent => (
                   <button key={ent.id}
-                    onClick={() => { setSelectedEntity(ent); setEntityForm({ name: ent.name, type: ent.type, logo_key: ent.logo_key ?? '', primary_color: ent.primary_color ?? '#C5A028' }) }}
+                    onClick={() => {
+                  setSelectedEntity(ent)
+                  setEntityForm({
+                    name: ent.name,
+                    type: ent.type,
+                    logo_key: ent.logo_key ?? '',
+                    primary_color: ent.primary_color ?? '#C5A028',
+                    address:  (ent as any).address  ?? '',
+                    phone:    (ent as any).phone    ?? '',
+                    email:    (ent as any).email    ?? '',
+                    tagline:  (ent as any).tagline  ?? '',
+                    logo_url: (ent as any).logo_url ?? '',
+                  })
+                }}
                     className="text-left p-4 rounded-lg border group relative overflow-hidden transition-all"
                     style={selectedEntity?.id === ent.id
                       ? { background: 'var(--gold-glow)', borderColor: 'var(--gold)' }
@@ -465,6 +482,51 @@ export default function AdminClient({ initialProfiles, initialEntities, initialU
                       <input className={`${inputCls} font-mono uppercase`}
                         value={entityForm.primary_color}
                         onChange={e => setEntityForm(p => ({ ...p, primary_color: e.target.value }))} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* ─── FIELDS PDF ─────────────────────────────────── */}
+                <div className="pt-3 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
+                  <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--gold)' }}>
+                    ⚙️ Konfigurasi Dokumen PDF
+                  </p>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="section-label block mb-1.5">Alamat Perusahaan</label>
+                      <textarea rows={2} className={inputCls + ' resize-none'}
+                        placeholder="Jl. Contoh No.1, Kota..."
+                        value={(entityForm as any).address || ''}
+                        onChange={e => setEntityForm(p => ({ ...p, address: e.target.value }))} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="section-label block mb-1.5">Telepon</label>
+                        <input className={inputCls} placeholder="08xxxxxxxxxx"
+                          value={(entityForm as any).phone || ''}
+                          onChange={e => setEntityForm(p => ({ ...p, phone: e.target.value }))} />
+                      </div>
+                      <div>
+                        <label className="section-label block mb-1.5">Email</label>
+                        <input className={inputCls} placeholder="info@divisi.com"
+                          value={(entityForm as any).email || ''}
+                          onChange={e => setEntityForm(p => ({ ...p, email: e.target.value }))} />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="section-label block mb-1.5">Tagline / Footer PDF</label>
+                      <input className={inputCls} placeholder="Contoh: Bespoke IT Consultancy • Semarang"
+                        value={(entityForm as any).tagline || ''}
+                        onChange={e => setEntityForm(p => ({ ...p, tagline: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label className="section-label block mb-1.5">Path Logo untuk PDF <span className="text-[9px] font-normal">(relatif ke /public, ex: /logo-png/weatso.png)</span></label>
+                      <input className={inputCls + ' font-mono text-xs'} placeholder="/logo-png/nama-logo.png"
+                        value={(entityForm as any).logo_url || ''}
+                        onChange={e => setEntityForm(p => ({ ...p, logo_url: e.target.value }))} />
+                      <p className="text-[9px] mt-1" style={{ color: 'var(--text-muted)' }}>
+                        File tersedia: /logo-png/weatso.png · /logo-png/evory.png · /logo-png/colabz.png · /logo-png/lokal.png
+                      </p>
                     </div>
                   </div>
                 </div>

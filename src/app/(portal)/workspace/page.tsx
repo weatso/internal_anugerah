@@ -18,10 +18,10 @@ const PRIORITY_STYLE: Record<string, { label: string; color: string }> = {
 }
 
 const KANBAN_COLS = [
-  { key: 'LEADS',       label: 'Leads',       color: '#6366f1', emoji: '🎯' },
-  { key: 'ONGOING',     label: 'Ongoing',     color: '#f59e0b', emoji: '⚡' },
-  { key: 'MAINTENANCE', label: 'Maintenance', color: '#3b82f6', emoji: '🔧' },
-  { key: 'COMPLETED',   label: 'Selesai',     color: '#10b981', emoji: '✅' },
+  { key: 'ACTIVE',     label: 'Active / Leads', color: '#6366f1', emoji: '🎯' },
+  { key: 'ON_HOLD',   label: 'On Hold',        color: '#3b82f6', emoji: '🔧' },
+  { key: 'COMPLETED', label: 'Selesai',         color: '#10b981', emoji: '✅' },
+  { key: 'CANCELLED', label: 'Dibatalkan',      color: '#ef4444', emoji: '❌' },
 ]
 
 const LOG_STATUS_STYLE: Record<string, string> = {

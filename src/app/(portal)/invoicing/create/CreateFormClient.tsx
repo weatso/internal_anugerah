@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { formatRupiah } from '@/lib/utils'
-import { Plus, Trash2, ChevronRight, X, RefreshCw, Save, Loader2 } from 'lucide-react'
+import { Plus, Trash2, ChevronRight, X, RefreshCw, Save, Loader2, BookOpen } from 'lucide-react'
 import { toast } from 'sonner'
 import { getDocumentTemplate } from '@/lib/document-templates'
 
@@ -54,6 +54,8 @@ export default function DocumentBuilderPage({ entityId, entityName, userId, acti
   const [deferredAccountId, setDeferredAccountId] = useState('')
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [catalogItems, setCatalogItems] = useState<any[]>([])
+  const [showCatalog, setShowCatalog] = useState(false)
 
   // STATE BYPASS CEO & DASAR FORM
   const [selectedEntityId, setSelectedEntityId] = useState(initialData?.entity_id || entityId)
@@ -115,6 +117,10 @@ export default function DocumentBuilderPage({ entityId, entityName, userId, acti
         const deferred = coa.find((a: any) => a.account_code === '2-1000')
         if (deferred) setDeferredAccountId(deferred.id)
       }
+
+      // Fetch Catalog
+      const { data: cat } = await supabase.from('service_catalog').select('*').eq('is_active', true).order('name')
+      if (cat) setCatalogItems(cat)
 
       // Fetch Commissions Jika Mode Edit
       if (isEditing && initialData?.id) {
@@ -223,7 +229,17 @@ export default function DocumentBuilderPage({ entityId, entityName, userId, acti
         await supabase.from('document_line_items').delete().eq('document_id', initialData.id)
         await supabase.from('document_line_items').insert(validLines.map((item, idx) => ({
           document_id: initialData.id,
-          description: item.description, quantity: Number(item.qty || 0), original_price: Number(item.original_price || item.unit_price || 0), discount_amount: Number(item.discount_amount || 0), unit_price: Number(item.unit_price || item.original_price || 0), total_price: item.total_price, sort_order: idx, is_recurring: item.is_recurring, duration_months: item.is_recurring ? item.duration_months : null, revenue_account_id: item.revenue_account_id || null, deferred_account_id: item.is_recurring ? deferredAccountId : null, discount_type: item.discount_type
+          description: item.description,
+          quantity: Number(item.qty || 0),
+          original_price: Number(item.original_price || item.unit_price || 0),
+          discount_amount: Number(item.discount_amount || 0),
+          unit_price: Number(item.unit_price || item.original_price || 0),
+          total_price: item.total_price,
+          sort_order: idx,
+          is_recurring: item.is_recurring,
+          duration_months: item.is_recurring ? Number(item.duration_months) : null,
+          revenue_account_id: item.revenue_account_id || null,
+          deferred_account_id: item.is_recurring ? deferredAccountId : null,
         })))
 
         // Update Komisi
@@ -240,7 +256,7 @@ export default function DocumentBuilderPage({ entityId, entityName, userId, acti
       } else {
         // MODE CREATE DOKUMEN BARU
         const divCode = selectedEntityName.substring(0, 3).toUpperCase() || 'AV'
-        const prefixMap: Record<string, string> = { QUOTATION: 'QUO', SPK: 'SPK', PROFORMA: 'PRO', INVOICE: 'INV', RECEIPT: 'REC' }
+        const prefixMap: Record<string, string> = { QUOTATION: 'QUO', SPK: 'SPK', INVOICE: 'INV', RECEIPT: 'REC' }
         const prefix = prefixMap[docType] || 'DOC'
         const docNumber = `${prefix}/${divCode}/${new Date().getFullYear()}/${Math.floor(1000 + Math.random() * 9000)}`
 
@@ -252,7 +268,18 @@ export default function DocumentBuilderPage({ entityId, entityName, userId, acti
 
         if (doc) {
           await supabase.from('document_line_items').insert(validLines.map((item, idx) => ({
-            document_id: doc.id, description: item.description, quantity: Number(item.qty || 0), original_price: Number(item.original_price || item.unit_price || 0), discount_amount: Number(item.discount_amount || 0), unit_price: Number(item.unit_price || item.original_price || 0), total_price: item.total_price, sort_order: idx, is_recurring: item.is_recurring, duration_months: item.is_recurring ? item.duration_months : null, revenue_account_id: item.revenue_account_id || null, deferred_account_id: item.is_recurring ? deferredAccountId : null, discount_type: item.discount_type
+            document_id: doc.id,
+            description: item.description,
+            quantity: Number(item.qty || 0),
+            original_price: Number(item.original_price || item.unit_price || 0),
+            discount_amount: Number(item.discount_amount || 0),
+            unit_price: Number(item.unit_price || item.original_price || 0),
+            total_price: item.total_price,
+            sort_order: idx,
+            is_recurring: item.is_recurring,
+            duration_months: item.is_recurring ? Number(item.duration_months) : null,
+            revenue_account_id: item.revenue_account_id || null,
+            deferred_account_id: item.is_recurring ? deferredAccountId : null,
           })))
 
           const validComm = commissions.filter(c => c.commission_amount > 0)
@@ -324,7 +351,6 @@ export default function DocumentBuilderPage({ entityId, entityName, userId, acti
               <select className={`${fieldCls} font-bold`} style={{ color: 'var(--gold)' }} value={docType} disabled={isEditing} onChange={e => setDocType(e.target.value)}>
                 <option value="QUOTATION">Quotation / Offering</option>
                 <option value="SPK">SPK</option>
-                <option value="PROFORMA">Proforma Invoice</option>
                 <option value="INVOICE">Invoice</option>
                 <option value="RECEIPT">Receipt</option>
               </select>
@@ -392,9 +418,16 @@ export default function DocumentBuilderPage({ entityId, entityName, userId, acti
           <div className="glass-card p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--gold)' }}>Rincian Harga (Line Items)</h2>
-              <button type="button" onClick={addLine} className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-1" style={{ color: 'var(--gold)' }}>
-                <Plus className="w-3 h-3" /> Tambah Item
-              </button>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => setShowCatalog(true)}
+                  className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-1 px-2 py-1 rounded"
+                  style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)' }}>
+                  <BookOpen className="w-3 h-3" /> Import Katalog
+                </button>
+                <button type="button" onClick={addLine} className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-1" style={{ color: 'var(--gold)' }}>
+                  <Plus className="w-3 h-3" /> Tambah Item
+                </button>
+              </div>
             </div>
 
             <div className="space-y-4">
@@ -597,6 +630,67 @@ export default function DocumentBuilderPage({ entityId, entityName, userId, acti
           </div>
         </div>
       </div>
+
+      {/* ─── MODAL IMPORT KATALOG ─────────────────────────────────────── */}
+      {showCatalog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)' }}>
+          <div className="w-full max-w-lg rounded-xl p-6 space-y-4 max-h-[85vh] overflow-y-auto"
+            style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-black" style={{ color: 'var(--text-primary)' }}>Import dari Katalog</h2>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Klik item untuk langsung menambahkan ke dokumen.</p>
+              </div>
+              <button onClick={() => setShowCatalog(false)} style={{ color: 'var(--text-muted)' }}>
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-2">
+              {catalogItems.length === 0 && (
+                <p className="text-sm text-center py-8" style={{ color: 'var(--text-muted)' }}>Belum ada item di katalog. Tambahkan di menu Katalog & Portofolio.</p>
+              )}
+              {catalogItems.map(svc => (
+                <button key={svc.id} type="button"
+                  onClick={() => {
+                    setLineItems(p => [...p, {
+                      id: Date.now(),
+                      description: svc.name,
+                      qty: 1,
+                      original_price: svc.base_price,
+                      discount_amount: '',
+                      discount_type: 'nominal' as const,
+                      unit_price: svc.base_price,
+                      total_price: svc.base_price,
+                      is_recurring: svc.is_recurring || false,
+                      duration_months: svc.default_duration_months || 1,
+                      revenue_account_id: svc.revenue_account_id || '',
+                    }])
+                    setShowCatalog(false)
+                    toast.success(`"${svc.name}" ditambahkan ke dokumen`)
+                  }}
+                  className="w-full text-left p-4 rounded-lg transition-all hover:bg-white/5 border"
+                  style={{ borderColor: 'var(--border-subtle)', background: 'var(--bg-secondary)' }}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>{svc.name}</p>
+                      {svc.description && <p className="text-xs mt-0.5 line-clamp-1" style={{ color: 'var(--text-muted)' }}>{svc.description}</p>}
+                      {svc.is_recurring && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded mt-1 inline-block"
+                          style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8' }}>
+                          Recurring · {svc.default_duration_months} bln
+                        </span>
+                      )}
+                    </div>
+                    <p className="font-black font-mono text-sm shrink-0 ml-3" style={{ color: 'var(--gold)' }}>
+                      Rp {Number(svc.base_price).toLocaleString('id-ID')}
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

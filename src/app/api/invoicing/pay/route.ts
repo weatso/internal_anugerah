@@ -25,7 +25,7 @@ export async function POST(req: Request) {
 
     const db = admin()
 
-    // 1. Fetch invoice + line items
+    // 1. Fetch invoice + line items + clients
     const { data: invoice, error: invErr } = await db
       .from('commercial_documents')
       .select('*, document_line_items(*), clients(*)')
@@ -36,7 +36,7 @@ export async function POST(req: Request) {
     // Anti double-entry
     if (invoice.linked_journal_id) throw new Error('Invoice ini sudah pernah diproses (double-entry prevented)')
 
-    // 2. Lookup akun COA yang dibutuhkan
+    // 2. Lookup akun COA
     const { data: coas } = await db.from('chart_of_accounts').select('id, account_code')
     const coaMap = Object.fromEntries((coas || []).map(c => [c.account_code, c.id]))
     const deferredAccountId = coaMap['2-1000']
@@ -47,31 +47,25 @@ export async function POST(req: Request) {
     const lineItems = invoice.document_line_items || []
     const journalLines: { account_id: string; debit: number; credit: number }[] = []
 
-    let totalCashIn = 0
     let totalDiscount = 0
 
     for (const item of lineItems) {
-      const originalTotal = (Number(item.original_price) || Number(item.total_price)) * Number(item.quantity || 1)
+      const originalTotal = (Number(item.original_price) || Number(item.unit_price)) * Number(item.quantity || 1)
       const discountAmt = Number(item.discount_amount) || 0
-      const netAmount = originalTotal - discountAmt
-
-      totalCashIn += netAmount
       totalDiscount += discountAmt
 
-      // Kredit: Deferred Revenue (recurring) atau Revenue langsung (non-recurring)
       const creditAccountId = item.is_recurring
         ? (item.deferred_account_id || deferredAccountId)
-        : (item.revenue_account_id || deferredAccountId) // fallback ke deferred jika belum diset
+        : (item.revenue_account_id || deferredAccountId)
       
       journalLines.push({ account_id: creditAccountId, debit: 0, credit: originalTotal })
 
-      // Debit Diskon (jika ada)
       if (discountAmt > 0 && discountAccountId) {
         journalLines.push({ account_id: discountAccountId, debit: discountAmt, credit: 0 })
       }
     }
 
-    // Debit Bank (kas masuk = grand_total dari invoice)
+    // Debit Bank
     journalLines.push({ account_id: bank_account_id, debit: Number(invoice.grand_total), credit: 0 })
 
     // 4. Buat journal entry
@@ -123,24 +117,54 @@ export async function POST(req: Request) {
       await db.from('revenue_recognitions').insert(recognitions)
     }
 
-    // 8. Auto-create project dengan magic link
+    // 8. FIX: Cek apakah project dari SPK sudah ada — jika ya, update; jika tidak, buat baru
     const startDate = paidDate.toISOString().slice(0, 10)
     const maxDuration = Math.max(...lineItems.filter((i: any) => i.is_recurring).map((i: any) => Number(i.duration_months) || 0), 0)
     const endDate = maxDuration > 0
       ? (() => { const d = new Date(paidDate); d.setMonth(d.getMonth() + maxDuration); return d.toISOString().slice(0, 10) })()
       : null
 
-    await db.from('projects').insert({
-      entity_id: invoice.entity_id,
-      client_id: invoice.client_id,
-      invoice_id: invoice_id,
-      name: invoice.title,
-      status: 'ACTIVE',
-      start_date: startDate,
-      end_date: endDate,
-    })
+    // Cek apakah sudah ada project dari konversi SPK (parent_id invoice = SPK)
+    if (invoice.parent_id) {
+      const { data: existingProject } = await db
+        .from('projects')
+        .select('id')
+        .eq('spk_id', invoice.parent_id)
+        .maybeSingle()
 
-    // 9. Aktifkan komisi yang sudah di-draft (dari form invoice)
+      if (existingProject) {
+        // Update project yang sudah ada dengan invoice_id dan timeline
+        await db.from('projects').update({
+          invoice_id: invoice_id,
+          start_date: startDate,
+          end_date: endDate,
+        }).eq('id', existingProject.id)
+      } else {
+        // Buat project baru hanya jika belum ada
+        await db.from('projects').insert({
+          entity_id: invoice.entity_id,
+          client_id: invoice.client_id,
+          invoice_id: invoice_id,
+          name: invoice.title,
+          status: 'ACTIVE',
+          start_date: startDate,
+          end_date: endDate,
+        })
+      }
+    } else {
+      // Invoice mandiri (tidak dari SPK) — buat project baru
+      await db.from('projects').insert({
+        entity_id: invoice.entity_id,
+        client_id: invoice.client_id,
+        invoice_id: invoice_id,
+        name: invoice.title,
+        status: 'ACTIVE',
+        start_date: startDate,
+        end_date: endDate,
+      })
+    }
+
+    // 9. Aktifkan komisi yang sudah di-draft
     await db.from('commissions').update({ status: 'PENDING' })
       .eq('invoice_id', invoice_id).eq('status', 'DRAFT')
 

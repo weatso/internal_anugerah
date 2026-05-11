@@ -47,9 +47,18 @@ export async function GET(request: Request) {
       }
     }
 
+    // FIX: Gunakan alias yang cocok dengan yang dibaca di InvoiceDocument.tsx:
+    // - data.client  (bukan data.clients)
+    // - data.items   (bukan data.document_line_items)
+    // - data.entity  (bukan data.entities)
     const { data: document, error } = await db
       .from('commercial_documents')
-      .select('*, entities(name, type, primary_color, logo_key), clients(*), document_line_items(*)')
+      .select(`
+        *,
+        entity:entities(name, type, primary_color, logo_key),
+        client:clients(*),
+        items:document_line_items(*)
+      `)
       .eq('id', docId)
       .single()
 
