@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import {
@@ -15,6 +16,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/components/providers/UserProvider'
 import { formatRupiah } from '@/lib/utils'
 import { getEntityAccentColor } from '@/lib/division-config'
+import { toast } from 'sonner'
 import type { Entity } from '@/types'
 
 interface MonthlyPoint {
@@ -62,6 +64,7 @@ const renderActiveShape = (props: any) => {
 }
 
 export default function CEOCommandCenter() {
+  const router = useRouter()
   const { profile, impersonate, effectiveEntityId } = useUser()
   const supabase = createClient()
 
@@ -75,6 +78,17 @@ export default function CEOCommandCenter() {
   const [totalRevenueMTD, setTotalRevenueMTD] = useState(0)
   const [activePieIndex, setActivePieIndex]   = useState(0)
   const [loading, setLoading]                 = useState(true)
+
+  const handleDeepSwitch = (entityId: string, entityName: string) => {
+    toast.info(`Membuka akses ke HEAD ${entityName}...`)
+    
+    // Tanam identitas divisi dan role HEAD ke dalam inti browser
+    document.cookie = `active_entity_id=${entityId}; path=/; max-age=${60 * 60 * 24 * 7}`
+    document.cookie = `active_role=HEAD; path=/; max-age=${60 * 60 * 24 * 7}`
+    
+    // Paksa sistem memuat ulang dari awal untuk menerapkan Zero-Trust baru
+    window.location.href = '/dashboard'
+  }
 
   useEffect(() => { fetchAll() }, [])
 
@@ -401,7 +415,8 @@ export default function CEOCommandCenter() {
             return (
               <button
                 key={div.id}
-                onClick={() => isTarget ? impersonate(null) : impersonate(div.id)}
+                // INI KUNCINYA: Eksekusi Deep Switch saat diklik
+                onClick={() => handleDeepSwitch(div.id, div.name)} 
                 className="group relative text-left rounded-sm border transition-all duration-300 overflow-hidden"
                 style={{
                   aspectRatio: '4/5',
@@ -409,6 +424,7 @@ export default function CEOCommandCenter() {
                   borderColor: isTarget ? color : 'var(--border-subtle)',
                   boxShadow: isTarget ? `0 0 24px ${color}25` : 'none',
                 }}
+                title={`Masuk sebagai HEAD ${div.name}`}
               >
                 {/* Logo as large background — top-right */}
                 {logoSrc && (

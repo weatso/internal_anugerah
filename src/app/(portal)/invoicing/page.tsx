@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { formatRupiah } from '@/lib/utils'
-import { Plus, Receipt } from 'lucide-react'
+import { Plus, Receipt, Globe } from 'lucide-react'
 import InvoicingClientActions from './InvoicingClientActions'
 
 export default async function CommercialHubPage() {
@@ -24,19 +24,34 @@ export default async function CommercialHubPage() {
     .eq('id', activeEntityId)
     .single()
 
-  // Ambil Daftar Dokumen Komersial
-  const { data: docs } = await supabase
+  const isCEO = activeRole === 'CEO'
+  // Deteksi apakah entitas saat ini adalah Holding / Anugerah
+  const isHolding = entity?.name?.toLowerCase().includes('anugerah') || entity?.name?.toLowerCase().includes('holding')
+
+  // LOGIKA HELICOPTER VIEW: Jika CEO berada di Holding, tarik semua data komersial dari semua divisi.
+  let query = supabase
     .from('commercial_documents')
-    .select('*, client:clients(company_name)')
-    .eq('entity_id', activeEntityId)
+    .select('*, client:clients(company_name), entity:entities(name)')
     .order('created_at', { ascending: false })
 
-  // Ambil Rekening Bank untuk fitur pelunasan
-  const { data: bankAccounts } = await supabase
+  // Jika BUKAN CEO di Holding, kunci ketat data berdasarkan divisinya (Zero-Trust)
+  if (!(isCEO && isHolding)) {
+    query = query.eq('entity_id', activeEntityId)
+  }
+
+  const { data: docs } = await query
+
+  // Ambil Rekening Bank (Tarik semua bank jika CEO di Holding agar bisa bayar invoice Weatso dari dasbor Anugerah)
+  let bankQuery = supabase
     .from('chart_of_accounts')
-    .select('id, account_name')
+    .select('id, account_name, entity:entities(name)')
     .eq('is_bank', true)
     .eq('is_active', true)
+
+  if (!(isCEO && isHolding)) {
+    bankQuery = bankQuery.eq('entity_id', activeEntityId)
+  }
+  const { data: bankAccounts } = await bankQuery
 
   const isCEOOrFinance = ['CEO', 'FINANCE'].includes(activeRole)
 
@@ -47,8 +62,14 @@ export default async function CommercialHubPage() {
         <div>
           <p className="text-[10px] uppercase tracking-[0.3em] font-bold mb-1 text-[#D4AF37]">Commercial Hub</p>
           <h1 className="text-2xl font-black tracking-tight text-[--color-text-primary]">Daftar Dokumen Komersial</h1>
-          <p className="text-sm mt-1 text-[--color-text-muted]">
-            Divisi Aktif: <span className="font-bold text-[--color-text-primary]">{entity?.name || 'Holding'}</span>
+          <p className="text-sm mt-1 text-[--color-text-muted] flex items-center gap-2">
+            Kapasitas Aktif: 
+            <span className="font-bold text-[--color-text-primary]">{entity?.name || 'Unknown'}</span>
+            {isCEO && isHolding && (
+              <span className="text-[9px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded uppercase tracking-widest font-bold border border-blue-500/20">
+                Holding View Active
+              </span>
+            )}
           </p>
         </div>
         <Link 
@@ -64,7 +85,7 @@ export default async function CommercialHubPage() {
         {!docs || docs.length === 0 ? (
           <div className="py-16 text-center">
             <Receipt className="w-10 h-10 mx-auto mb-3 opacity-20 text-white" />
-            <p className="text-sm text-[--color-text-muted]">Belum ada dokumen diterbitkan untuk divisi ini.</p>
+            <p className="text-sm text-[--color-text-muted]">Belum ada dokumen yang diterbitkan.</p>
           </div>
         ) : (
           <div className="divide-y divide-white/5">
@@ -75,15 +96,21 @@ export default async function CommercialHubPage() {
               return (
                 <div key={doc.id} className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-white/[0.015] transition-colors">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded border border-[#D4AF37]/50 text-[#D4AF37] bg-[#D4AF37]/10">
                         {doc.doc_type}
                       </span>
+                      {/* Lencana Identitas Divisi (Hanya muncul jika di Helicopter View) */}
+                      {isCEO && isHolding && doc.entity?.name && (
+                        <span className="text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded border border-blue-500/30 text-blue-400 bg-blue-500/10 flex items-center gap-1">
+                          <Globe className="w-3 h-3" /> {doc.entity.name}
+                        </span>
+                      )}
                       <span className="text-[10px] font-mono text-[--color-text-muted]">{doc.doc_number}</span>
                     </div>
-                    <p className="font-bold text-base text-[--color-text-primary]">{doc.title}</p>
+                    <p className="font-bold text-base text-[--color-text-primary] mt-1">{doc.title}</p>
                     <p className="text-xs mt-1 text-[--color-text-muted]">
-                      Klien: {doc.client?.company_name} · Terbit: {doc.issue_date}
+                      Klien: {doc.client?.company_name} · Terbit: {new Date(doc.issue_date).toLocaleDateString('id-ID')}
                     </p>
                   </div>
                   
