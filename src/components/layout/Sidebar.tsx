@@ -17,7 +17,7 @@ import Image from 'next/image'
 import { UnifiedSwitcher } from './UnifiedSwitcher'
 
 const FINANCE_ITEMS = [
-  { href: '/finance/transactions',     label: 'Buku Besar',             icon: BookOpen,       roles: ['CEO','FINANCE','HEAD','STAFF'] },
+  { href: '/finance/transactions',     label: 'Buku Besar',            icon: BookOpen,       roles: ['CEO','FINANCE','HEAD','STAFF'] },
   { href: '/finance/expenses',         label: 'Biaya & Pengeluaran',    icon: Receipt,        roles: ['CEO','FINANCE','HEAD'] },
   { href: '/finance/reports',          label: 'Laporan P&L',            icon: BarChart3,      roles: ['CEO','FINANCE','HEAD'] },
   { href: '/finance/master-data',      label: 'Master COA',             icon: Layers,         roles: ['CEO'] },
@@ -40,7 +40,6 @@ const BOTTOM_NAV = [
   { href: '/settings',    label: 'Settings',            icon: Settings,     roles: ['CEO','FINANCE','HEAD','STAFF'] },
 ]
 
-// KITA TAMBAHKAN PROPS activeRole dan activeEntityId DARI SERVER
 interface SidebarProps { 
   onClose?: () => void;
   activeRole?: string;
@@ -53,6 +52,7 @@ export function Sidebar({ onClose, activeRole = 'STAFF', activeEntityId }: Sideb
   const [mounted, setMounted] = useState(false)
   const [financeOpen, setFinanceOpen] = useState(false)
   const [profile, setProfile] = useState<any>(null)
+  const [entityName, setEntityName] = useState<string>('Memuat...') // State Divisi Dinamis
 
   const pathname = usePathname()
   const router = useRouter()
@@ -61,16 +61,22 @@ export function Sidebar({ onClose, activeRole = 'STAFF', activeEntityId }: Sideb
 
   useEffect(() => {
     setMounted(true)
-    // Ambil data profil langsung di sini, tanpa lewat UserProvider yang bermasalah
-    async function loadProfile() {
+    async function loadData() {
+      // 1. Tarik Profil Pengguna
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
         setProfile(data)
       }
+      
+      // 2. Tarik Nama Entitas (Divisi) secara Real-Time berdasarkan Impersonate
+      if (activeEntityId) {
+        const { data: ent } = await supabase.from('entities').select('name').eq('id', activeEntityId).single()
+        if (ent) setEntityName(ent.name)
+      }
     }
-    loadProfile()
-  }, [supabase])
+    loadData()
+  }, [supabase, activeEntityId])
 
   useEffect(() => {
     if (pathname.startsWith('/finance')) setFinanceOpen(true)
@@ -117,7 +123,6 @@ export function Sidebar({ onClose, activeRole = 'STAFF', activeEntityId }: Sideb
     )
   }
 
-  // Gunakan activeRole dari Server Props
   const visibleFinance = FINANCE_ITEMS.filter(i => i.roles.includes(activeRole))
   const isFinanceActive = pathname.startsWith('/finance')
 
@@ -243,8 +248,11 @@ export function Sidebar({ onClose, activeRole = 'STAFF', activeEntityId }: Sideb
               )}
               <div className="overflow-hidden whitespace-nowrap">
                 <p className="text-[11px] font-bold truncate leading-none mb-1" style={{ color: 'var(--text-primary)' }}>{profile.full_name}</p>
-                <p className="text-[9px] uppercase tracking-widest font-medium truncate" style={{ color: 'var(--text-muted)' }}>
-                  {activeRole}
+                {/* INJEKSI: Menggabungkan Role dengan Nama Entitas Divisi Asli */}
+                <p className="text-[9px] uppercase tracking-widest font-bold truncate flex items-center gap-1" style={{ color: 'var(--gold)' }}>
+                  <span>{activeRole}</span>
+                  <span style={{ color: 'var(--text-muted)' }}>•</span>
+                  <span style={{ color: 'var(--text-muted)' }}>{entityName}</span>
                 </p>
               </div>
             </div>

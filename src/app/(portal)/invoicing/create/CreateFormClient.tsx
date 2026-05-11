@@ -16,17 +16,19 @@ interface Props {
   allEntities: { id: string; name: string }[]
 }
 
+// Ganti definisi interface ini
 interface LineItem {
   id: number
   description: string
-  qty: number
-  original_price: number
-  discount_amount: number
-  unit_price: number
+  qty: number | ''         // <-- Ubah ini
+  original_price: number | '' // <-- Ubah ini
+  discount_amount: number | '' // <-- Ubah ini
+  unit_price: number | ''
   total_price: number
   is_recurring: boolean
-  duration_months: number
+  duration_months: number | ''
   revenue_account_id: string
+  discount_type: 'nominal' | 'percentage' // <-- TAMBAHKAN INI UNTUK DISKON %
 }
 
 interface Commission {
@@ -64,9 +66,10 @@ export default function DocumentBuilderPage({ entityId, entityName, userId, acti
   const [taxRate, setTaxRate] = useState(0)
 
   const [lineItems, setLineItems] = useState<LineItem[]>([{
-    id: Date.now(), description: '', qty: 1,
-    original_price: 0, discount_amount: 0, unit_price: 0, total_price: 0,
+    id: Date.now(), description: '', qty: '',          // <-- Ubah qty
+    original_price: '', discount_amount: '', unit_price: '', total_price: 0, // <-- Ubah default
     is_recurring: false, duration_months: 1, revenue_account_id: '',
+    discount_type: 'nominal' // <-- Tambahkan ini
   }])
 
   const [commissions, setCommissions] = useState<Commission[]>([])
@@ -93,22 +96,45 @@ export default function DocumentBuilderPage({ entityId, entityName, userId, acti
   function updateLine(id: number, field: string, value: any) {
     setLineItems(prev => prev.map(item => {
       if (item.id !== id) return item
+      
       const u = { ...item, [field]: value }
-      if (field === 'original_price' || field === 'discount_amount') {
-        u.unit_price = Math.max(0, Number(u.original_price) - Number(u.discount_amount))
+      
+      // Sanitasi nilai input kosong
+      const currentQty = u.qty === '' ? 0 : Number(u.qty)
+      const currentOriPrice = u.original_price === '' ? 0 : Number(u.original_price)
+      let currentDiscount = u.discount_amount === '' ? 0 : Number(u.discount_amount)
+
+      // Jika mengubah tipe diskon, reset nominal diskon untuk keamanan
+      if (field === 'discount_type') {
+         u.discount_amount = ''
+         currentDiscount = 0
       }
-      if (field === 'unit_price') u.original_price = Number(value)
-      u.total_price = Number(u.qty) * Number(u.unit_price || u.original_price)
+
+      // Hitung nominal diskon sesungguhnya
+      let actualDiscountNominal = 0
+      if (u.discount_type === 'percentage') {
+         // Batasi persentase maksimal 100%
+         if (currentDiscount > 100) currentDiscount = 100
+         actualDiscountNominal = currentOriPrice * (currentDiscount / 100)
+      } else {
+         actualDiscountNominal = currentDiscount
+      }
+
+      // Kalkulasi Harga Satuan & Total
+      u.unit_price = Math.max(0, currentOriPrice - actualDiscountNominal)
+      u.total_price = currentQty * u.unit_price
+
       return u
     }))
   }
 
   function addLine() {
     setLineItems(p => [...p, {
-      id: Date.now(), description: '', qty: 1,
-      original_price: 0, discount_amount: 0, unit_price: 0, total_price: 0,
+      id: Date.now(), description: '', qty: '',          // <-- Ubah qty
+      original_price: '', discount_amount: '', unit_price: '', total_price: 0, // <-- Ubah default
       is_recurring: false, duration_months: 1,
       revenue_account_id: revenueAccounts[0]?.id || '',
+      discount_type: 'nominal' // <-- Tambahkan ini
     }])
   }
 
@@ -341,18 +367,51 @@ export default function DocumentBuilderPage({ entityId, entityName, userId, acti
                     <div>
                       <label className="text-[9px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>Qty</label>
                       <input type="number" min={1} className={`${inputCls} font-mono`} style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
-                        value={item.qty} onChange={e => updateLine(item.id, 'qty', Number(e.target.value))} />
+                        value={item.qty} 
+                        onChange={e => updateLine(item.id, 'qty', e.target.value === '' ? '' : Number(e.target.value))} 
+                        placeholder="1"
+                      />
                     </div>
                     <div>
                       <label className="text-[9px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>Harga Asli (Rp)</label>
                       <input type="number" min={0} className={`${inputCls} font-mono`} style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
-                        value={item.original_price} onChange={e => updateLine(item.id, 'original_price', Number(e.target.value))} />
+                        value={item.original_price} 
+                        onChange={e => updateLine(item.id, 'original_price', e.target.value === '' ? '' : Number(e.target.value))} 
+                        placeholder="0"
+                      />
                     </div>
-                    <div>
-                      <label className="text-[9px] font-bold uppercase tracking-widest" style={{ color: '#f97316' }}>Diskon (Rp)</label>
-                      <input type="number" min={0} className={`${inputCls} font-mono`} style={{ borderColor: '#f97316', color: '#f97316' }}
-                        value={item.discount_amount} onChange={e => updateLine(item.id, 'discount_amount', Number(e.target.value))} />
+                    
+                    {/* MODIFIKASI AREA DISKON */}
+                    <div className="relative">
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[9px] font-bold uppercase tracking-widest" style={{ color: '#f97316' }}>Diskon</label>
+                        {/* Switcher Tipe Diskon */}
+                        <select 
+                          className="text-[9px] bg-transparent outline-none font-bold uppercase cursor-pointer" 
+                          style={{ color: '#f97316' }}
+                          value={item.discount_type}
+                          onChange={e => updateLine(item.id, 'discount_type', e.target.value)}
+                        >
+                          <option value="nominal" className="bg-black text-white">Rp</option>
+                          <option value="percentage" className="bg-black text-white">%</option>
+                        </select>
+                      </div>
+                      
+                      <div className="relative">
+                        <input type="number" min={0} max={item.discount_type === 'percentage' ? 100 : undefined} 
+                          className={`${inputCls} font-mono pr-6`} 
+                          style={{ borderColor: '#f97316', color: '#f97316' }}
+                          value={item.discount_amount} 
+                          onChange={e => updateLine(item.id, 'discount_amount', e.target.value === '' ? '' : Number(e.target.value))} 
+                          placeholder="0"
+                        />
+                        {/* Simbol Indikator */}
+                        <span className="absolute right-0 top-1/2 -translate-y-1/2 text-xs font-mono" style={{ color: '#f97316' }}>
+                           {item.discount_type === 'percentage' ? '%' : ''}
+                        </span>
+                      </div>
                     </div>
+                    
                     <div>
                       <label className="text-[9px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>Total Baris</label>
                       <p className="mt-1 font-black font-mono text-sm" style={{ color: 'var(--gold)' }}>{formatRupiah(item.total_price)}</p>
@@ -384,7 +443,7 @@ export default function DocumentBuilderPage({ entityId, entityName, userId, acti
                             value={item.duration_months}
                             onChange={e => updateLine(item.id, 'duration_months', Number(e.target.value))} />
                           <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
-                            ≈ {formatRupiah(item.original_price / item.duration_months)} / bln
+                            ≈ {formatRupiah(Number(item.original_price) / (Number(item.duration_months) || 1))} / bln
                           </p>
                         </div>
                       )}
