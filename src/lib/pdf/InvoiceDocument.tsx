@@ -72,8 +72,14 @@ const styles = StyleSheet.create({
   tableLabel: { fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5 },
   tableEmpty: { fontSize: 9, color: '#9ca3af', textAlign: 'center', padding: 16 },
 
-  // ─── SUMMARY ──────────────────────────────────────────────────────────────
-  summaryContainer: { marginTop: 16, flexDirection: 'row', justifyContent: 'flex-end' },
+  // ─── BOTTOM SECTION (PAYMENT & SUMMARY) ───────────────────────────────────
+  bottomSection: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 },
+  
+  paymentBox: { width: '48%', backgroundColor: '#f9fafb', padding: 10, borderRadius: 4, borderLeftWidth: 3 },
+  paymentTitle: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: '#9ca3af', textTransform: 'uppercase', marginBottom: 6 },
+  paymentBank: { fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#111827', marginBottom: 2 },
+  paymentDetail: { fontSize: 9, color: '#374151', marginBottom: 2 },
+
   summaryBox: { width: 230 },
   divider: { borderTopWidth: 1, borderTopColor: '#e5e7eb', marginBottom: 8, marginTop: 4 },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 },
@@ -83,18 +89,17 @@ const styles = StyleSheet.create({
   grandTotalLabel: { fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#111827' },
   grandTotalValue: { fontSize: 13, fontFamily: 'Helvetica-Bold', color: '#D4AF37' },
 
-  // ─── FOOTER ───────────────────────────────────────────────────────────────
+  // ─── FOOTER & VALIDATION ──────────────────────────────────────────────────
+  footerContainer: { position: 'absolute', bottom: 25, left: 50, right: 50 },
+  validationBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderTopWidth: 1, borderTopColor: '#eeeeee', paddingTop: 10, marginBottom: 10 },
+  qrPlaceholder: { width: 40, height: 40, backgroundColor: '#f3f4f6', marginRight: 10 },
+  validationText: { fontSize: 7, color: '#6b7280', lineHeight: 1.3 },
+  validationLink: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: '#2563eb', marginTop: 2 },
+  
   footer: {
-    position: 'absolute',
-    bottom: 28,
-    left: 50,
-    right: 50,
     textAlign: 'center',
     fontSize: 7,
     color: '#9ca3af',
-    borderTopWidth: 1,
-    borderTopColor: '#eeeeee',
-    paddingTop: 8,
   },
 })
 
@@ -127,8 +132,9 @@ function resolveAccentColor(entity: any): string {
 }
 
 export function CommercialDocumentPDF({ data }: { data: any }) {
-  const entity  = data.entity
-  const client  = data.client
+  // KEAMANAN MUTLAK: Mendukung fallback 'entities' maupun 'entity' dari API Supabase
+  const entity  = data.entities || data.entity || {}
+  const client  = data.clients || data.client || {}
   const items   = data.items || []
 
   const accentColor = resolveAccentColor(entity)
@@ -146,6 +152,10 @@ export function CommercialDocumentPDF({ data }: { data: any }) {
 
   const issueDate = fmtDate(data.issue_date)
   const dueDate   = fmtDate(data.due_date)
+
+  // ── Logika Injeksi Fitur Baru ──────────────────────────────────────────
+  const showPayment = ['SPK', 'PROFORMA', 'INVOICE'].includes(data.doc_type)
+  const validationUrl = `https://anugerah.weatso.com/p/${data.id || 'validation-link'}`
 
   return (
     <Document title={`${data.doc_type} - ${data.doc_number}`}>
@@ -165,6 +175,8 @@ export function CommercialDocumentPDF({ data }: { data: any }) {
           {/* Alamat Perusahaan */}
           <View style={styles.addressBox}>
             <Text style={styles.companyTitle}>{companyName}</Text>
+            {/* NPWP Perusahaan Opsional */}
+            {entity?.tax_id && <Text style={[styles.addressText, { fontFamily: 'Helvetica-Bold', marginBottom: 2 }]}>NPWP: {entity.tax_id}</Text>}
             <Text style={styles.addressText}>{companyAddress}</Text>
             <Text style={[styles.addressText, { marginTop: 3 }]}>
               Telp: {companyPhone}
@@ -178,6 +190,12 @@ export function CommercialDocumentPDF({ data }: { data: any }) {
           <View style={styles.clientBox}>
             <Text style={styles.label}>Dipersiapkan Untuk:</Text>
             <Text style={styles.valueBold}>{client?.company_name || '—'}</Text>
+            
+            {/* NPWP Klien Opsional */}
+            {client?.npwp && (
+               <Text style={[styles.addressText, { marginTop: 3, fontFamily: 'Helvetica-Bold' }]}>NPWP: {client.npwp}</Text>
+            )}
+
             {client?.pic_name && (
               <Text style={[styles.addressText, { marginTop: 4 }]}>
                 Attn: {client.pic_name}{client.pic_position ? `, ${client.pic_position}` : ''}
@@ -194,7 +212,7 @@ export function CommercialDocumentPDF({ data }: { data: any }) {
           {/* Info Dokumen */}
           <View style={styles.docInfoBox}>
             <Text style={[styles.docTypeTitle, { color: accentColor }]}>{data.doc_type}</Text>
-            <Text style={styles.docNumberText}>No. {data.doc_number}</Text>
+            <Text style={[styles.docNumberText, { color: accentColor }]}>No. {data.doc_number}</Text>
             {data.termin_name && (
               <Text style={[styles.addressText, { marginTop: 4, fontFamily: 'Helvetica-Bold', color: accentColor }]}>
                 {data.termin_name}
@@ -227,7 +245,6 @@ export function CommercialDocumentPDF({ data }: { data: any }) {
 
         {/* ─── TABLE LINE ITEMS ─────────────────────────────────────────── */}
         <View style={styles.tableSpacer}>
-          {/* Header */}
           <View style={styles.tableHeader}>
             <Text style={[styles.tableLabel, styles.colDesc]}>Deskripsi Layanan / Proyek</Text>
             <Text style={[styles.tableLabel, styles.colQty]}>Qty</Text>
@@ -235,7 +252,6 @@ export function CommercialDocumentPDF({ data }: { data: any }) {
             <Text style={[styles.tableLabel, styles.colTotal]}>Total</Text>
           </View>
 
-          {/* Rows */}
           {items.length > 0 ? (
             items.map((item: any, i: number) => (
               <View key={i} style={[styles.tableRow, i % 2 === 1 ? styles.tableRowAlt : {}]}>
@@ -270,8 +286,25 @@ export function CommercialDocumentPDF({ data }: { data: any }) {
           )}
         </View>
 
-        {/* ─── SUMMARY ──────────────────────────────────────────────────── */}
-        <View style={styles.summaryContainer}>
+        {/* ─── BOTTOM SECTION (PAYMENT & SUMMARY) ───────────────────────── */}
+        <View style={styles.bottomSection}>
+          
+          {/* Kotak Instruksi Pembayaran Kiri */}
+          <View style={showPayment ? [styles.paymentBox, { borderLeftColor: accentColor }] : { width: '48%' }}>
+            {showPayment && (
+              <>
+                <Text style={styles.paymentTitle}>Instruksi Pembayaran</Text>
+                <Text style={styles.paymentBank}>Bank Central Asia (BCA)</Text>
+                <Text style={styles.paymentDetail}>No. Rekening: 123-456-7890</Text> 
+                <Text style={styles.paymentDetail}>A/N: WEATSO INDONESIA</Text>
+                <Text style={[styles.paymentDetail, { marginTop: 4, fontSize: 7, color: '#6b7280' }]}>
+                  Harap sertakan Nomor Dokumen ({data.doc_number}) pada berita transfer.
+                </Text>
+              </>
+            )}
+          </View>
+
+          {/* Kotak Kalkulasi Kanan */}
           <View style={styles.summaryBox}>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Subtotal</Text>
@@ -283,19 +316,30 @@ export function CommercialDocumentPDF({ data }: { data: any }) {
                 <Text style={styles.summaryValue}>{formatRupiah(data.tax_amount)}</Text>
               </View>
             )}
-            <View style={styles.grandTotalRow}>
+            <View style={[styles.grandTotalRow, { borderTopColor: accentColor }]}>
               <Text style={styles.grandTotalLabel}>TOTAL INVESTASI</Text>
               <Text style={[styles.grandTotalValue, { color: accentColor }]}>{formatRupiah(data.grand_total)}</Text>
             </View>
           </View>
+
         </View>
 
-        {/* ─── FOOTER ───────────────────────────────────────────────────── */}
-        <View style={styles.footer}>
-          <Text>
-            Dokumen ini adalah penawaran resmi dari {companyName} dan diterbitkan secara elektronik.
+        {/* ─── FOOTER & VALIDATION ──────────────────────────────────────── */}
+        <View style={styles.footerContainer}>
+          <View style={styles.validationBox}>
+            {/* QR Code Placeholder */}
+            <View style={styles.qrPlaceholder}></View>
+            <View>
+              <Text style={styles.validationText}>Pindai QR atau akses tautan berikut untuk memvalidasi keaslian dokumen ini.</Text>
+              <Text style={styles.validationText}>Status pengerjaan dan SPK terintegrasi langsung dalam Portal Klien Anugerah OS.</Text>
+              <Text style={styles.validationLink}>{validationUrl}</Text>
+            </View>
+          </View>
+
+          <Text style={styles.footer}>
+            Dokumen ini diterbitkan secara elektronik dan merupakan penawaran resmi dari {companyName}.
+            {"\n"}{companyTagline}
           </Text>
-          <Text style={{ marginTop: 2, fontFamily: 'Helvetica-Bold' }}>{companyTagline}</Text>
         </View>
 
       </Page>

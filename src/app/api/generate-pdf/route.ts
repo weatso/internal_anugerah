@@ -8,7 +8,6 @@ import { createClient } from '@supabase/supabase-js'
 
 export async function GET(request: Request) {
   try {
-    // ── VERIFIKASI SESI ─────────────────────────────────────────────────────
     const cookieStore = await cookies()
     const supabaseAuth = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,23 +18,20 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url)
     const docId = searchParams.get('id')
-    const token = searchParams.get('token') // public access via client portal token
+    const token = searchParams.get('token')
 
     if (!docId) return new NextResponse('Document ID is required', { status: 400 })
 
-    // Allow access if: logged-in user OR valid public portal token
     if (!session && !token) {
       return new NextResponse('Unauthorized', { status: 401 })
     }
 
-    // Use service role to fetch doc (bypass RLS — we handle auth above)
     const db = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
-    // If accessed via token, validate the token matches a project linked to this invoice
     if (!session && token) {
       const { data: project } = await db
         .from('projects')
@@ -43,22 +39,15 @@ export async function GET(request: Request) {
         .eq('magic_link_token', token)
         .single()
       if (!project || project.invoice_id !== docId) {
-        return new NextResponse('Forbidden: Token tidak valid untuk dokumen ini', { status: 403 })
+        return new NextResponse('Forbidden: Token tidak valid', { status: 403 })
       }
     }
 
-    // FIX: Gunakan alias yang cocok dengan yang dibaca di InvoiceDocument.tsx:
-    // - data.client  (bukan data.clients)
-    // - data.items   (bukan data.document_line_items)
-    // - data.entity  (bukan data.entities)
+    // ALIAS DITAMBAHKAN DI SINI: items:document_line_items(*)
+    // Ini memastikan data bisa dibaca oleh PDF Template
     const { data: document, error } = await db
       .from('commercial_documents')
-      .select(`
-        *,
-        entity:entities(name, type, primary_color, logo_key),
-        client:clients(*),
-        items:document_line_items(*)
-      `)
+      .select('*, entities(name, type, primary_color, logo_key), clients(*), items:document_line_items(*)')
       .eq('id', docId)
       .single()
 
@@ -73,11 +62,21 @@ export async function GET(request: Request) {
     }
     const pdfBuffer = Buffer.concat(chunks)
 
+    // FORMAT PENAMAAN FILE DINAMIS
+    const cleanStr = (str: string) => (str || '').replace(/[^a-zA-Z0-9]/g, '_')
+    const docType = document.doc_type || 'DOC'
+    const divName = document.entities?.name || 'Divisi'
+    const clientName = document.clients?.company_name || 'Client'
+    const dateStr = document.issue_date ? new Date(document.issue_date).toLocaleDateString('id-ID').replace(/\//g, '-') : 'Date'
+    
+    // Hasil: Quotation_Weatso_UD_Dokar_11-5-2026.pdf
+    const fileName = `${docType}_${cleanStr(divName)}_${cleanStr(clientName)}_${dateStr}.pdf`
+
     return new NextResponse(pdfBuffer, {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `inline; filename="${document.doc_number.replace(/\//g, '_')}.pdf"`,
+        'Content-Disposition': `inline; filename="${fileName}"`,
       },
     })
   } catch (error: any) {
