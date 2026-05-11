@@ -1,9 +1,15 @@
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
+// SANITASI MUTLAK: Memastikan endpoint memiliki protokol yang sah
+const rawEndpoint = process.env.R2_ENDPOINT || ''
+const safeEndpoint = rawEndpoint.startsWith('http') ? rawEndpoint : `https://${rawEndpoint}`
+
 const R2 = new S3Client({
   region: 'auto',
-  endpoint: process.env.R2_ENDPOINT!,
+  endpoint: safeEndpoint,
+  // INI ADALAH KUNCI UNTUK MENCEGAH SSL HANDSHAKE FAILURE DI CLOUDFLARE R2
+  forcePathStyle: true, 
   credentials: {
     accessKeyId: process.env.R2_ACCESS_KEY_ID!,
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
