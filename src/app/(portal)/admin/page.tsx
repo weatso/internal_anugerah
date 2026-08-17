@@ -28,20 +28,15 @@ export default async function AdminPage() {
     .eq('id', session.user.id)
     .single()
 
-  // 3. Verifikasi CEO — cek profiles.roles (legacy) ATAU user_roles table (baru)
-  let isCEO = currentUser?.roles?.includes('CEO') ?? false
+  // 3. Verifikasi CEO Mutlak (Hanya menggunakan user_roles karena kolom lama sudah hangus)
+  const { data: ceoRole } = await supabase
+    .from('user_roles')
+    .select('id')
+    .eq('user_id', session.user.id)
+    .eq('role', 'CEO')
+    .maybeSingle()
 
-  if (!isCEO) {
-    const { data: ceoRole } = await supabase
-      .from('user_roles')
-      .select('id')
-      .eq('user_id', session.user.id)
-      .eq('role', 'CEO')
-      .maybeSingle()
-    isCEO = !!ceoRole
-  }
-
-  if (!isCEO) {
+  if (!ceoRole) {
     return (
       <div className="flex h-screen items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
         <div className="text-center space-y-4 p-8">
@@ -64,10 +59,11 @@ export default async function AdminPage() {
   )
 
   // 5. Tarik semua data dengan service role (bypass RLS)
+  // Perbaikan Mutlak: Menghapus join ke entitas dari profiles karena relasinya sekarang murni di user_roles
   const [{ data: profiles }, { data: entities }, { data: userRoles }] = await Promise.all([
     supabaseAdmin
       .from('profiles')
-      .select('*, entity:entities(*)')
+      .select('*') 
       .order('created_at', { ascending: false }),
     supabaseAdmin
       .from('entities')
@@ -76,7 +72,7 @@ export default async function AdminPage() {
       .order('name'),
     supabaseAdmin
       .from('user_roles')
-      .select('*, entity:entities(*)'),
+      .select('*, entity:entities(*)')
   ])
 
   return (
